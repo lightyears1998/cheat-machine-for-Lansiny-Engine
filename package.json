@@ -1,0 +1,24 @@
+{
+  "name": "cheat-engine-for-lansiny-engine",
+  "version": "1.0.0",
+  "description": "Lansiny 的游戏实在是太难了。🤣",
+  "main": "src/main.ts",
+  "repository": "https://github.com/lightyears1998/CheatEngineForLansinyEngine.git",
+  "author": "lightyears <lightyears1998@hotmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "ts-node src/index.ts",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "ts-node": "^9.1.1",
+    "typescript": "^4.1.3"
+  },
+  "devDependencies": {
+    "@lightyears1998/eslint-config-lightyears-style": "^1.5.0",
+    "@typescript-eslint/eslint-plugin": "^4.14.2",
+    "@typescript-eslint/parser": "^4.14.2",
+    "eslint": "^7.19.0",
+    "eslint-plugin-import": "^2.22.1"
+  }
+}
