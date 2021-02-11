@@ -1,9 +1,13 @@
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
+import yaml from "js-yaml";
 
-import { hideBin } from "./util";
-import { MapSourceJSON } from "./type/MapSourceJSON";
+import {
+  ensureSourceAndOutput, hideBin, saferOutputPath
+} from "./util";
+import { MapSourceJSON } from "./type";
 import { GameMap, MapBlock } from "./type";
+import { identifyItem } from "./data";
 const argv = yargs(hideBin(process.argv)).argv;
 
 const help = "buildMapFromJSON source.json map.json --auto-truncate";
@@ -13,14 +17,18 @@ const command = argv._.shift();
 if (!command) {
   console.log(help);
 } else if (command === "buildMapFromJSON") {
-  const [source, output] = [argv._.shift(), argv._.shift()] as string[];
+  let source = argv._.shift();
+  let output = argv._.shift();
+  [source, output] = ensureSourceAndOutput(source, output);
+  saferOutputPath(output);
+
   const autoTruncate = argv.autoTruncate as boolean;
 
   const sourceMapFile = fs.readFileSync(source, { encoding: "utf-8" });
   const sourceMapJSON: MapSourceJSON = JSON.parse(sourceMapFile);
 
   const {
-    height, width, data
+    height, width, data, events
   } = sourceMapJSON;
   let map: GameMap;
 
@@ -76,8 +84,19 @@ if (!command) {
     }
   }
 
-  console.log(blocks.map(item => item.map(i => i.isPassable)));
+  for (const event of events) {
+    if (event != null) {
+      const { x, y } = event;
+      const [i, j] = [y, x];
 
+      if (startX <= i && i <= endX && startY <= j && j <= endY) {
+        const item = identifyItem(event);
+        blocks[i - startX][j - startY].item = item;
+      }
+    }
+  }
+
+  fs.writeFileSync(output, yaml.dump(map));
 } else {
   throw new Error("Unknown command.");
 }

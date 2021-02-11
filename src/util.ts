@@ -2,7 +2,22 @@ export function hideBin(argv: Array<string>): Array<string> {
   return argv.slice(2);
 }
 
-export function getMapFromJSON(json: string) {
-  // Map0XX.json 的 data 字段是地图数据，width 字段和 height 字段指定宽高。
-  // data 字段长度 width * height，分为 6 个切片，第三个切片通常可以观察出与地形的关联。
+export function ensureSourceAndOutput(source: string | number | undefined, output: string | number | undefined): [string, string] {
+  if (!source || !output) {
+    throw new Error("Must specify source and output file");
+  }
+
+  return [String(source), String(output)];
+}
+
+export function saferOutputPath(output: string | undefined): string {
+  if (!output) {
+    throw new Error("Must specify output path");
+  }
+
+  if (!output.startsWith("./var/") && !output.startsWith("var/")) {
+    throw new Error("Output path must start with \"var\" in case of miss typed");
+  }
+
+  return output;
 }

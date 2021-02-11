@@ -1,11 +1,11 @@
-import { Item } from "./Item";
+import { Item } from "../data/Item";
 
 export class MapBlock {
   item?: Item
 
   constructor(
-    public x: number,
-    public y: number,
+    /** 行偏移量 */ public x: number,
+    /** 列偏移量 */ public y: number,
     public isPassable: boolean
   ) { }
 }

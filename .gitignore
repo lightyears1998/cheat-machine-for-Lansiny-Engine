@@ -5,5 +5,5 @@
 node_modules
 
 # 运行时数据
-var/**
-!var/.gitkeep
+var/*
+!var/upstream
