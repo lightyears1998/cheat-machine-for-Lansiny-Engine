@@ -1,13 +1,13 @@
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
-import yaml from "js-yaml";
 
 import {
-  ensureSourceAndOutput, hideBin, saferOutputPath
+  ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, saferOutputPath
 } from "./util";
-import { MapSourceJSON } from "./entity";
+import { Actor, MapSourceJSON } from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
+import { Game } from "./entity/Game";
 const argv = yargs(hideBin(process.argv)).argv;
 
 const help = "buildMapFromJSON source.json map.json --auto-truncate";
@@ -70,10 +70,10 @@ if (!command) {
     }
 
     const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
-    map = new GameMap(actualHeight, actualWidth);
+    map = new GameMap(10, actualHeight, actualWidth);
 
   } else {
-    map = new GameMap(height, width);
+    map = new GameMap(10, height, width);
   }
 
   const blocks = map.blocks;
@@ -96,7 +96,25 @@ if (!command) {
     }
   }
 
-  fs.writeFileSync(output, yaml.dump(map));
+  fs.writeFileSync(output, GameMap.dump(map));
+} else if (command === "buildGame") {
+  const mapPaths = Array.isArray(argv.map) ? argv.map : [argv.map];
+  const [initial, target] = getInitialAndTargetLocation(String(argv.initial), String(argv.target));
+  const output = saferOutputPath(String(argv._.shift()));
+
+  const maps = [];
+  for (const path of mapPaths) {
+    const map = GameMap.load(fs.readFileSync(path, { encoding: "utf-8" }));
+    maps.push(map);
+  }
+
+  const actor = Actor.create({});
+
+  const game = Game.create({
+    maps, initial, target, actor
+  });
+
+  fs.writeFileSync(output, Game.dump(game));
 } else {
   throw new Error("Unknown command.");
 }

@@ -14,7 +14,7 @@ globals:
   Atomics: readonly
   SharedArrayBuffer: readonly
 rules:
-  indent:
+  "@typescript-eslint/indent":
     - warn
     - 2
     - SwitchCase: 1

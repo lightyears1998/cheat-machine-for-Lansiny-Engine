@@ -1,5 +1,7 @@
 export enum DoorKeySubtype {
   YELLOW,
   BLUE,
-  RED
+  RED,
+  INGENIOUS_DOOR,
+  IRON_DOOR
 }

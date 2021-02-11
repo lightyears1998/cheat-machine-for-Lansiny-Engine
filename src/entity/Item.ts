@@ -6,10 +6,12 @@ import {
 } from ".";
 
 export class Item {
-  constructor(
-    public type: ItemType,
-    public subtype: number
-  ) {}
+  type!: ItemType
+  subtype!: number
+
+  static create(data: Partial<Item>) {
+    return Object.assign(new Item(), data);
+  }
 }
 
 export function identifyItem(event: MapEvent): Item | undefined {
@@ -25,9 +27,9 @@ export function identifyItem(event: MapEvent): Item | undefined {
               if (typeof parameter === "string" && parameter.startsWith("pickUpPotion")) {
                 const rank = parseInt(parameter.substring("pickUpPotion(".length));
                 if (rank === 1) {
-                  return new Item(ItemType.POTION, PotionRank.LV1);
+                  return Item.create({ type: ItemType.POTION, subtype: PotionRank.LV1 });
                 } else if (rank === 2) {
-                  return new Item(ItemType.POTION, PotionRank.LV2);
+                  return Item.create({ type: ItemType.POTION, subtype: PotionRank.LV2 });
                 }
                 throw new Error("unknown Potion Level: " + JSON.stringify(entry));
               }
@@ -39,11 +41,29 @@ export function identifyItem(event: MapEvent): Item | undefined {
     }
 
     case "黄钥匙": {
-      return new Item(ItemType.KEY, DoorKeySubtype.YELLOW);
+      return Item.create({ type: ItemType.KEY, subtype: DoorKeySubtype.YELLOW });
     }
 
     case "蓝钥匙": {
-      return new Item(ItemType.KEY, DoorKeySubtype.BLUE);
+      return Item.create({ type: ItemType.KEY, subtype: DoorKeySubtype.BLUE });
+    }
+
+    case "黄门": {
+      return Item.create({ type: ItemType.DOOR, subtype: DoorKeySubtype.YELLOW });
+    }
+
+    case "蓝门": {
+      return Item.create({ type: ItemType.DOOR, subtype: DoorKeySubtype.BLUE });
+    }
+
+    case "机关门": {
+      return Item.create({ type: ItemType.DOOR, subtype: DoorKeySubtype.INGENIOUS_DOOR });
+      // TODO 解读机关门细节
+    }
+
+    case "铁门": {
+      return Item.create({ type: ItemType.DOOR, subtype: DoorKeySubtype.IRON_DOOR });
+      // TODO 解读铁门细节
     }
 
     case "红宝石": {
@@ -54,7 +74,7 @@ export function identifyItem(event: MapEvent): Item | undefined {
               if (typeof parameter === "string" && parameter.startsWith("pickUpGem")) {
                 const rank = parameter.substring("pickUpGem(".length).split(",")[0];
                 if (rank === "1") {
-                  return new Item(ItemType.RED_GEM, RedGemRank.LV1);
+                  return Item.create({ type: ItemType.RED_GEM, subtype: RedGemRank.LV1 });
                 }
                 throw new Error("unknown Red GEM Level: " + JSON.stringify(entry));
               }
@@ -73,7 +93,7 @@ export function identifyItem(event: MapEvent): Item | undefined {
               if (typeof parameter === "string" && parameter.startsWith("pickUpGem")) {
                 const rank = parameter.substring("pickUpGem(".length).split(",")[0];
                 if (rank === "1") {
-                  return new Item(ItemType.BLUE_GEM, BlueGemRank.LV1);
+                  return Item.create({ type: ItemType.BLUE_GEM, subtype: BlueGemRank.LV1 });
                 }
                 throw new Error("unknown Blue GEM Level: " + JSON.stringify(entry));
               }

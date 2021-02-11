@@ -1,3 +1,7 @@
+import { isNumberString } from "class-validator";
+
+import { GameLocation } from "./entity/Game";
+
 export function hideBin(argv: Array<string>): Array<string> {
   return argv.slice(2);
 }
@@ -20,4 +24,15 @@ export function saferOutputPath(output: string | undefined): string {
   }
 
   return output;
+}
+
+export function getInitialAndTargetLocation(initial: string, target: string): [GameLocation, GameLocation] {
+  return [getGameLocation(initial), getGameLocation(target)];
+}
+
+export function getGameLocation(locationString: string): GameLocation {
+  const location = locationString.split("").filter(ch => isNumberString(ch) || ch === ",").join("").replace(/,/g, " ").split(/\s+/g);
+  return {
+    mapId: Number(location[0]), row: Number(location[1]), col: Number(location[2])
+  };
 }
