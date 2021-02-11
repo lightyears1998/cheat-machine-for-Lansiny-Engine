@@ -1,3 +1,11 @@
+import { Item } from "./Item";
+
 export class MapBlock {
-  constructor(public id: number) {}
+  item?: Item
+
+  constructor(
+    public x: number,
+    public y: number,
+    public isPassable: boolean
+  ) { }
 }

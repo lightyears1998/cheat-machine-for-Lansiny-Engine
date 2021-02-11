@@ -1,5 +1,3 @@
-import { EndOfLineState } from "typescript";
-
 import { Enemy } from "./Enemy";
 
 export class Actor {

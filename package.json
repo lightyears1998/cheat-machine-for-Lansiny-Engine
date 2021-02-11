@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "@types/fs-extra": "^9.0.6",
+    "@types/yargs": "^16.0.0",
     "fs-extra": "^9.1.0",
     "ts-node": "^9.1.1",
-    "typescript": "^4.1.3"
+    "typescript": "^4.1.3",
+    "yargs": "^16.2.0"
   },
   "devDependencies": {
     "@lightyears1998/eslint-config-lightyears-style": "^1.5.0",

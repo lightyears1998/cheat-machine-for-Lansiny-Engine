@@ -1,36 +1,83 @@
-import path from "path";
-
+import yargs from "yargs/yargs";
 import fs from "fs-extra";
 
-const mapFile = fs.readFileSync(path.resolve(__dirname, "../data/Map011.json"), { encoding: "utf8" });
-const map = JSON.parse(mapFile);
+import { hideBin } from "./util";
+import { MapSourceJSON } from "./type/MapSourceJSON";
+import { GameMap, MapBlock } from "./type";
+const argv = yargs(hideBin(process.argv)).argv;
 
-const st = new Set();
-const data = map.data;
+const help = "buildMapFromJSON source.json map.json --auto-truncate";
 
-// function query(x: number, y: number) {
-//   const offset = 6 * ((x - 1) * 25 + y - 1);
-//   const res = [];
-//   for (let i = 0; i < 6; ++i) {
-//     res.push(data[offset + i]);
-//   }
-//   console.log(x, y, res);
-// }
+const command = argv._.shift();
 
-// for (let i = 1; i <= 25; ++i) {
-//   query(12, i);
-// }
+if (!command) {
+  console.log(help);
+} else if (command === "buildMapFromJSON") {
+  const [source, output] = [argv._.shift(), argv._.shift()] as string[];
+  const autoTruncate = argv.autoTruncate as boolean;
 
-let s = "";
+  const sourceMapFile = fs.readFileSync(source, { encoding: "utf-8" });
+  const sourceMapJSON: MapSourceJSON = JSON.parse(sourceMapFile);
 
-for (let k = 0; k < 6; ++k) {
-  for (let i = 0; i < 15; ++i) {
-    for (let j = 0; j < 25; ++j) {
-      s += data[k*15*25 + i*25 + j] + "\t\t";
+  const {
+    height, width, data
+  } = sourceMapJSON;
+  let map: GameMap;
+
+  let [
+    startX,
+    startY,
+    endX,
+    endY
+  ] = [
+    0,
+    0,
+    height - 1,
+    width - 1
+  ] as number[];
+
+  if (autoTruncate) {
+    // GameMap.data 数组长度 6 * height * width
+    // 偏移量 3 * height * width 处为地图图层，可获知图块可否穿过。
+    let started = false, ended = false;
+
+    for (let i = 0; i < height && !started; ++i) {
+      for (let j = 0; j < width && !started; ++j) {
+        const datum = data[3 * height * width + i * width + j];
+        if (datum !== 0) {
+          startX = i, startY = j;
+          started = true;
+        }
+      }
     }
-    s+="\n";
-  }
-  s += "\n\n";
-}
 
-fs.writeFileSync("./output.txt", s);
+    for (let i = height - 1; i >= 0 && !ended; --i) {
+      for (let j = width - 1; j >= 0 && !ended; --j) {
+        const datum = data[4 * height * width - 1 - (width - 1 - j) - width * (height - 1 - i)];
+        if (datum !== 0) {
+          endX = i, endY = j;
+          ended = true;
+        }
+      }
+    }
+
+    const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
+    map = new GameMap(actualHeight, actualWidth);
+
+  } else {
+    map = new GameMap(height, width);
+  }
+
+  const blocks = map.blocks;
+  for (let i = 0; i <= endX - startX; ++i) {
+    for (let j = 0; j <= endY - startY; ++j) {
+      const pos = 3 * height * width + width * (startX + i) + startY + j;
+      blocks[i][j] = new MapBlock(i, j, data[pos] === 584);
+    }
+  }
+
+  console.log(blocks.map(item => item.map(i => i.isPassable)));
+
+} else {
+  throw new Error("Unknown command.");
+}

@@ -3,3 +3,7 @@
 
 # 项目依赖
 node_modules
+
+# 运行时数据
+var/**
+!var/.gitkeep
