@@ -5,9 +5,9 @@ import yaml from "js-yaml";
 import {
   ensureSourceAndOutput, hideBin, saferOutputPath
 } from "./util";
-import { MapSourceJSON } from "./type";
-import { GameMap, MapBlock } from "./type";
-import { identifyItem } from "./data";
+import { MapSourceJSON } from "./entity";
+import { GameMap, MapBlock } from "./entity";
+import { identifyItem } from "./entity";
 const argv = yargs(hideBin(process.argv)).argv;
 
 const help = "buildMapFromJSON source.json map.json --auto-truncate";

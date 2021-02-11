@@ -1,5 +1,4 @@
-import { MapEvent } from "../type";
-
+import { MapEvent } from "./MapSourceJSON";
 import { ItemType } from "./ItemType";
 
 import {

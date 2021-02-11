@@ -1,4 +1,4 @@
-import { Item } from "../data/Item";
+import { Item } from "./Item";
 
 export class MapBlock {
   item?: Item

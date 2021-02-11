@@ -1,5 +1,5 @@
-import { Item } from "../data/Item";
-import { ItemType } from "../data/ItemType";
+import { Item } from "./Item";
+import { ItemType } from "./ItemType";
 
 export class Enemy extends Item {
   type = ItemType.ENEMY

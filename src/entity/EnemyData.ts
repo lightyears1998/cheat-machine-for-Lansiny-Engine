@@ -1,5 +1,4 @@
-import { Enemy } from "../type";
-
+import { Enemy } from "./Enemy";
 import { ItemType } from "./ItemType";
 
 const enemyData = {
