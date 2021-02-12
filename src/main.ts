@@ -1,5 +1,6 @@
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
+import yaml from "js-yaml";
 
 import {
   directionVector,
@@ -126,22 +127,44 @@ if (!command) {
 
   const initialSituation = new Situation();
 
+  // 注册地图 ID
+  game.maps.map(map => map.mapId).forEach(id => initialSituation.maps.add(id));
+
   // 对地图的每一部分进行连通分量分析
-  let nextMark = 1;
+  const graphMap = initialSituation.graphs;
+
+  let nextGraphId = 1;
+  const registerGraph = (mapId: number, i: number, j: number) => {
+    const graphId = nextGraphId++;
+    const graph = new Graph();
+    graph.mapId = mapId;
+    graph.graphId = graphId;
+    graph.firstItemLocation = [i, j];
+    graphMap.set(graphId, graph);
+
+    return graphId;
+  };
+
+  const connectGraph = (graphIdA: number, graphIdB: number) => {
+    const graphA = graphMap.get(graphIdA) as Graph;
+    const graphB = graphMap.get(graphIdB) as Graph;
+    graphA.connectedGraphs.add(graphIdB);
+    graphB.connectedGraphs.add(graphIdA);
+  };
+
   for (const map of game.maps) {
     const {
-      height, width, blocks
+      mapId, height, width, blocks
     } = map;
-    const graphMap = new Map<number, Graph>();
 
-    const mark = make2DArray(height, width, 0);
+    const graphIdMarks = make2DArray(height, width, 0);
     for (let i = 0; i < height; ++i) {
       for (let j = 0; j < width; ++j) {
-        if (!blocks[i][j].isPassable || mark[i][j] !== 0) {
+        if (!blocks[i][j].isPassable || graphIdMarks[i][j] !== 0) {
           continue;
         }
 
-        mark[i][j] = nextMark++;
+        graphIdMarks[i][j] = registerGraph(mapId, i, j);
 
         const queue = [[i, j]] as Array<[number, number]>;
         while (queue.length > 0) {
@@ -155,13 +178,13 @@ if (!command) {
               nearJ
             ] = [...current, ...near];
 
-            if (nearI >= 0 && nearI < height && nearJ >= 0 && nearJ < width && mark[nearI][nearJ] === 0) {
+            if (nearI >= 0 && nearI < height && nearJ >= 0 && nearJ < width && graphIdMarks[nearI][nearJ] === 0) {
               if (blocks[nearI][nearJ].isPassable) {
-                console.log(nearI, nearJ, blocks[nearI][nearJ].item, isBlockingItem(blocks[nearI][nearJ].item));
-                if (!isBlockingItem(blocks[nearI][nearJ].item)) {
-                  mark[nearI][nearJ] = mark[currentI][currentJ];
+                if (!isBlockingItem(blocks[nearI][nearJ].item) && !isBlockingItem(blocks[currentI][currentJ].item)) {
+                  graphIdMarks[nearI][nearJ] = graphIdMarks[currentI][currentJ];
                 } else {
-                  mark[nearI][nearJ] = nextMark++;
+                  graphIdMarks[nearI][nearJ] = registerGraph(mapId, nearI, nearJ);
+                  connectGraph(graphIdMarks[currentI][currentJ], graphIdMarks[nearI][nearJ]);
                 }
                 queue.push([nearI, nearJ]);
               }
@@ -171,9 +194,27 @@ if (!command) {
       }
     }
 
-    console.log(mark);
+    if (argv.debugMark) {
+      console.log(graphIdMarks);
+    }
+
+    for (let i = 0; i < height; ++i) {
+      for (let j = 0; j < width; ++j) {
+        const graphId = graphIdMarks[i][j];
+        if (graphId) {
+          const item = blocks[i][j].item;
+          if (item) {
+            const graph = graphMap.get(graphId) as Graph;
+            graph.items.push(item);
+          }
+        }
+      }
+    }
   }
 
+  if (argv.debugGraph) {
+    console.dir(graphMap, { depth: null });
+  }
 } else {
   throw new Error("Unknown command.");
 }
