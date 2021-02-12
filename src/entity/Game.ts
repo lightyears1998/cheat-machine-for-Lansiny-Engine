@@ -11,11 +11,14 @@ export class GameLocation {
 
 export class Game {
   maps!: GameMap[]
-  initial!: GameLocation
-  target!: GameLocation
+  initialLocation!: GameLocation
+  targetLocation!: GameLocation
   actor!: Actor
 
-  static create(data: Partial<Game>) {
+  initialGraphId!: number
+  targetGraphId!: number
+
+  static create(data: Partial<Game>): Game {
     return Object.assign(new Game(), data);
   }
 

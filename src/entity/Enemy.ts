@@ -1,7 +1,8 @@
+import { Fighter } from "./Fighter";
 import { Item } from "./Item";
 import { ItemType } from "./ItemType";
 
-export class Enemy extends Item {
+export class Enemy extends Item implements Fighter {
   type = ItemType.ENEMY
   subtype!: number
 

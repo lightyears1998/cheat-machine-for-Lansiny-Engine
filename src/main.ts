@@ -1,19 +1,19 @@
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
-import yaml from "js-yaml";
 
 import {
   directionVector,
   ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, make2DArray, saferOutputPath
 } from "./util";
 import {
-  Actor, isBlockingItem, MapSourceJSON
+  Actor, DoorKeySubtype, Enemy, isBlockingItem, isPermanentItem, Item, MapSourceJSON
 } from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
 import { Game } from "./entity/Game";
 import { Situation } from "./entity/Situation";
 import { Graph } from "./entity/Graph";
+import { ItemType } from "./entity/ItemType";
 const argv = yargs(hideBin(process.argv)).argv;
 
 const help = "请看 README";
@@ -117,7 +117,7 @@ if (!command) {
   const actor = Actor.create({});
 
   const game = Game.create({
-    maps, initial, target, actor
+    maps, initialLocation: initial, targetLocation: target, actor
   });
 
   fs.writeFileSync(output, Game.dump(game));
@@ -125,7 +125,9 @@ if (!command) {
   const gamePath = String(argv.game);
   const game = Game.load(fs.readFileSync(gamePath, { encoding: "utf-8" }));
 
+  // 处理初始情况
   const initialSituation = new Situation();
+  initialSituation.actor = new Actor();
 
   // 注册地图 ID
   game.maps.map(map => map.mapId).forEach(id => initialSituation.maps.add(id));
@@ -198,6 +200,50 @@ if (!command) {
       console.log(graphIdMarks);
     }
 
+    if (argv.debugGraph) {
+      console.dir(graphMap, { depth: null });
+    }
+
+    // 确认游戏开始时所在的区块
+    if (mapId === game.initialLocation.mapId) {
+      const { row, col } = game.initialLocation;
+
+      for (let i = 0; i < height; ++i) {
+        for (let j = 0; j < width; ++j) {
+          if (i === row && j === col) {
+            const graphId = graphIdMarks[i][j];
+            if (!graphId) {
+              throw new Error("Initial position is possibly not reachable");
+            }
+            game.initialGraphId = graphId;
+          }
+        }
+      }
+    }
+    initialSituation.currentGraphId = game.initialGraphId;
+
+    // 确认游戏终结位置所在的区块
+    if (mapId === game.targetLocation.mapId) {
+      const { row, col } = game.targetLocation;
+
+      for (let i = 0; i < height; ++i) {
+        for (let j = 0; j < width; ++j) {
+          if (i === row && j === col) {
+            const graphId = graphIdMarks[i][j];
+            if (!graphId) {
+              throw new Error("Target position is possibly not reachable");
+            }
+            game.targetGraphId = graphId;
+          }
+        }
+      }
+    }
+
+    if (!game.initialGraphId || !game.targetGraphId) {
+      throw new Error("Fail to determine initial graph or target graph");
+    }
+
+    // 收集区块内的物品
     for (let i = 0; i < height; ++i) {
       for (let j = 0; j < width; ++j) {
         const graphId = graphIdMarks[i][j];
@@ -212,8 +258,111 @@ if (!command) {
     }
   }
 
-  if (argv.debugGraph) {
-    console.dir(graphMap, { depth: null });
+  // 开始推理
+  const situations = [initialSituation] as Array<Situation>;
+  const solutions = [] as Array<Situation>;
+  let trial = 0, deadEnd = 0;
+
+  while (true) {
+    if (situations.length === 0) {
+      if (solutions.length > 0) {
+        console.log("Found solution!");
+        console.log(solutions[0].logs);
+        console.log("Possible solutions:", situations.length, "\ttrial:", trial, "\tdead end:", deadEnd);
+      } else {
+        console.log("Sorry but I can't find a solution.", "\ttrial:", trial, "\tdead end:", deadEnd);
+      }
+      break;
+    }
+
+    ++trial;
+
+    const situation = situations.shift() as Situation;
+    const currentGraph = situation.graphs.get(situation.currentGraphId) as Graph;
+    const actor = situation.actor;
+    const visitedGraphs = situation.visitedGraphs;
+
+    // 开始报告
+    const logs = [];
+
+    // 记录到达位置
+    visitedGraphs.add(currentGraph.graphId);
+    logs.push(`移动到${currentGraph.firstItemLocation} (${currentGraph.graphId})`);
+
+    // 处理当前区域的物品
+    for (let i = 0; i < currentGraph.items.length; ++i) {
+      const item = currentGraph.items[i];
+      const { type, subtype } = item;
+
+      switch (type) {
+        case ItemType.ENEMY: {
+          actor.fight(item as Enemy);
+          break;
+        }
+
+        case ItemType.RED_GEM: {
+          break;
+        }
+
+        case ItemType.BLUE_GEM: {
+          break;
+        }
+
+        case ItemType.DOOR: {
+          break;
+        }
+
+        case ItemType.KEY: {
+          switch (subtype) {
+            case DoorKeySubtype.YELLOW: actor.keyYellow++; break;
+            case DoorKeySubtype.BLUE: actor.keyBlue++; break;
+            case DoorKeySubtype.RED: actor.keyRed++; break;
+            default: throw new Error("Unable to handle this kind of key: " + subtype);
+          }
+          break;
+        }
+
+        case ItemType.POTION: {
+          break;
+        }
+
+        default: throw new Error("Unable to handle the item: " + JSON.stringify(item));
+      }
+    }
+
+    // 销毁不是永久物品的物品
+    currentGraph.items = currentGraph.items.filter(item => isPermanentItem(item));
+
+    // 结束报告
+    situation.logs += "# " + logs.join("；") + "\n";
+
+    // 判断当前是否位于目标区域
+    if (situation.currentGraphId === game.targetGraphId) {
+      solutions.push(situation);
+      continue;
+    }
+
+    // 聚合连通分量
+
+    // 决定下一步方向
+    if (/* 如果是传送门并且目标位置没有访问过 */ false) {
+      // 强制传送到目标地点
+    } else {
+      const hasNext = false;
+
+      // 在相邻区块中选择方向
+      for (const nextGraphId of Array.from(currentGraph.connectedGraphs)) {
+        const nextGraph = situation.graphs.get(nextGraphId) as Graph;
+        const firstItem = nextGraph.items[0];
+
+        console.log(nextGraphId, nextGraph);
+      }
+
+      // 如果无法进行下一步则判定为困毙
+      if (!hasNext) {
+        ++deadEnd;
+      }
+    }
   }
 } else {
   throw new Error("Unknown command.");

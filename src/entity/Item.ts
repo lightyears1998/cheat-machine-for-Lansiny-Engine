@@ -1,5 +1,3 @@
-import { UnaryExpression } from "typescript";
-
 import { MapEvent } from "./MapSourceJSON";
 import { ItemType } from "./ItemType";
 
@@ -11,13 +9,13 @@ export class Item {
   type!: ItemType
   subtype!: number
 
-  static create(data: Partial<Item>) {
+  static create(data: Partial<Item>): Item {
     return Object.assign(new Item(), data);
   }
 }
 
 export function identifyItem(event: MapEvent): Item | undefined {
-  const [name, level] = event.name.split(" ");
+  const [name] = event.name.split(" ");
   const { note } = event;
 
   switch (name) {
@@ -114,10 +112,14 @@ export function identifyItem(event: MapEvent): Item | undefined {
   return undefined;
 }
 
-export function isBlockingItem(item?: Item) {
+export function isBlockingItem(item?: Item): boolean {
   if (!item) {
     return false;
   }
 
   return item.type === ItemType.ENEMY || item.type === ItemType.DOOR;
+}
+
+export function isPermanentItem(item: Item): boolean {
+  return false;
 }
