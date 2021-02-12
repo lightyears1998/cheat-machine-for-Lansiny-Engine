@@ -2,6 +2,24 @@ import { isNumberString } from "class-validator";
 
 import { GameLocation } from "./entity/Game";
 
+export const directionVector = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1]
+] as Array<[number, number]>;
+
+export function make2DArray<T = undefined>(height: number, width: number, initial: T): Array<Array<T>> {
+  const arr = [] as Array<Array<T>>;
+  for (let i = 0; i < height; ++i) {
+    arr[i] = [];
+    for (let j = 0; j < width; ++j) {
+      arr[i][j] = initial;
+    }
+  }
+  return arr;
+}
+
 export function hideBin(argv: Array<string>): Array<string> {
   return argv.slice(2);
 }

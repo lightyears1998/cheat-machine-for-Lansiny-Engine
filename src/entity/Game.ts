@@ -1,7 +1,7 @@
 import yaml from "js-yaml";
 
 import { Actor } from "./Actor";
-import { GameMap } from "./Map";
+import { GameMap } from "./GameMap";
 
 export class GameLocation {
   mapId!: number

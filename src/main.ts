@@ -2,15 +2,20 @@ import yargs from "yargs/yargs";
 import fs from "fs-extra";
 
 import {
-  ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, saferOutputPath
+  directionVector,
+  ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, make2DArray, saferOutputPath
 } from "./util";
-import { Actor, MapSourceJSON } from "./entity";
+import {
+  Actor, isBlockingItem, MapSourceJSON
+} from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
 import { Game } from "./entity/Game";
+import { Situation } from "./entity/Situation";
+import { Graph } from "./entity/Graph";
 const argv = yargs(hideBin(process.argv)).argv;
 
-const help = "buildMapFromJSON source.json map.json --auto-truncate";
+const help = "请看 README";
 
 const command = argv._.shift();
 
@@ -115,6 +120,60 @@ if (!command) {
   });
 
   fs.writeFileSync(output, Game.dump(game));
+} else if (command === "run") {
+  const gamePath = String(argv.game);
+  const game = Game.load(fs.readFileSync(gamePath, { encoding: "utf-8" }));
+
+  const initialSituation = new Situation();
+
+  // 对地图的每一部分进行连通分量分析
+  let nextMark = 1;
+  for (const map of game.maps) {
+    const {
+      height, width, blocks
+    } = map;
+    const graphMap = new Map<number, Graph>();
+
+    const mark = make2DArray(height, width, 0);
+    for (let i = 0; i < height; ++i) {
+      for (let j = 0; j < width; ++j) {
+        if (!blocks[i][j].isPassable || mark[i][j] !== 0) {
+          continue;
+        }
+
+        mark[i][j] = nextMark++;
+
+        const queue = [[i, j]] as Array<[number, number]>;
+        while (queue.length > 0) {
+          const current = queue.shift() as [number, number];
+          for (const v of directionVector) {
+            const near = [current[0] + v[0], current[1] + v[1]];
+            const [
+              currentI,
+              currentJ,
+              nearI,
+              nearJ
+            ] = [...current, ...near];
+
+            if (nearI >= 0 && nearI < height && nearJ >= 0 && nearJ < width && mark[nearI][nearJ] === 0) {
+              if (blocks[nearI][nearJ].isPassable) {
+                console.log(nearI, nearJ, blocks[nearI][nearJ].item, isBlockingItem(blocks[nearI][nearJ].item));
+                if (!isBlockingItem(blocks[nearI][nearJ].item)) {
+                  mark[nearI][nearJ] = mark[currentI][currentJ];
+                } else {
+                  mark[nearI][nearJ] = nextMark++;
+                }
+                queue.push([nearI, nearJ]);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    console.log(mark);
+  }
+
 } else {
   throw new Error("Unknown command.");
 }

@@ -1,3 +1,5 @@
+import { UnaryExpression } from "typescript";
+
 import { MapEvent } from "./MapSourceJSON";
 import { ItemType } from "./ItemType";
 
@@ -110,4 +112,12 @@ export function identifyItem(event: MapEvent): Item | undefined {
   }
 
   return undefined;
+}
+
+export function isBlockingItem(item?: Item) {
+  if (!item) {
+    return false;
+  }
+
+  return item.type === ItemType.ENEMY || item.type === ItemType.DOOR;
 }
