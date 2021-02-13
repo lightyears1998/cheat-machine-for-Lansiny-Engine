@@ -1,3 +1,5 @@
+import { strictEqual } from "assert";
+
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
 
@@ -259,11 +261,11 @@ if (!command) {
   }
 
   // 开始推理
-  const situations = [initialSituation] as Array<Situation>;
+  let situations = [initialSituation] as Array<Situation>;
   const solutions = [] as Array<Situation>;
-  let trial = 0, deadEnd = 0;
+  let trial = 0, filter = 0, deadEnd = 0;
   let currentGraphCount = situations[0].graphs.size;
-  console.log(currentGraphCount, new Date());
+  console.log("Origin graph size:", currentGraphCount, new Date());
 
   while (true) {
     if (situations.length === 0) {
@@ -272,7 +274,7 @@ if (!command) {
         console.log(solutions[0].logs);
         console.log("Possible solutions:", situations.length, "\ttrial:", trial, "\tdead end:", deadEnd);
       } else {
-        console.log("Sorry but I can't find a solution.", "\ttrial:", trial, "\tdead end:", deadEnd);
+        console.log("Sorry but I can't find a solution.", "\ttrial:", trial, "\tdead end:", deadEnd, "\tfilter", filter);
       }
       break;
     }
@@ -288,9 +290,28 @@ if (!command) {
     const actor = situation.actor;
     const visitedGraphs = situation.visitedGraphs;
 
+    // 清理过时队伍
+    let awaiting = situations.length, coefficient = 0.5;
+    if (awaiting > 100000) {
+      const totalHp = situations.map(situation => situation.actor).reduce((ac, cur) => ac + ((cur.level - 1) * 200 + cur.hp), 0);
+      const averageHp = totalHp / awaiting;
+
+      while (awaiting > 100000) {
+        const baselineHp = averageHp * coefficient;
+        situations = situations.filter(situation => (situation.actor.level - 1) * 200 + situation.actor.hp >= baselineHp);
+
+        filter += awaiting - situations.length;
+        awaiting = situations.length;
+        coefficient = coefficient * 1.025;
+
+        console.log("trigger filter, baselineHp:", baselineHp, "filter:", filter, "awaiting:", awaiting);
+      }
+    }
+
+    // 层数报告
     if (situation.graphs.size !== currentGraphCount) {
       currentGraphCount = situation.graphs.size;
-      console.log(currentGraphCount, new Date(), situation.logs);
+      console.log("graph size:", currentGraphCount, "awaiting:", situations.length, new Date(), situation.logs);
     }
 
     // 开始报告
