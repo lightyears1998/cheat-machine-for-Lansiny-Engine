@@ -22,14 +22,14 @@ export const expRequiredForLevelUp: Record<string, number> = {
 
 const levels = Object.keys(expRequiredForLevelUp).map(k => Number(k)).sort((a, b) => a - b);
 
-const cumulativeExpRequiredForLevelUp: Record<string, number> = { 0: 0 };
+export const cumulativeExpRequiredForLevelUp: Record<string, number> = { 0: 0 };
 for (let level = 1; level < levels.length; ++level) {
   cumulativeExpRequiredForLevelUp[level] = expRequiredForLevelUp[level] + cumulativeExpRequiredForLevelUp[level - 1];
 }
 
 export class Actor implements Fighter {
   // 属性
-  level = 0
+  level = 1
   hp = 10
   atk = 0
   def = 0
@@ -234,7 +234,7 @@ export class Actor implements Fighter {
     // 战斗结算
     if (this.hp > 0) {
       this.exp += enemy.exp;
-      if (this.exp >= cumulativeExpRequiredForLevelUp[this.level + 1]) {
+      if (this.exp >= cumulativeExpRequiredForLevelUp[this.level]) {
         this.level++;
         this.levelUp();
       }

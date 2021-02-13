@@ -8,7 +8,7 @@ import {
   ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, make2DArray, saferOutputPath
 } from "./util";
 import {
-  Actor, DoorKeySubtype, Enemy, getPotionEffect, isBlockingItem, isPermanentItem, Item, MapSourceJSON
+  Actor, cumulativeExpRequiredForLevelUp, DoorKeySubtype, Enemy, getPotionEffect, isBlockingItem, isPermanentItem, Item, MapSourceJSON
 } from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
@@ -265,7 +265,12 @@ if (!command) {
   const solutions = [] as Array<Situation>;
   let trial = 0, filter = 0, deadEnd = 0;
   let currentGraphCount = situations[0].graphs.size;
-  console.log("Origin graph size:", currentGraphCount, new Date());
+  console.log(new Date(), "Origin graph size:", currentGraphCount);
+
+  const evaluate = (actor: Actor): number => {
+    const expToUpgrade = cumulativeExpRequiredForLevelUp[actor.level + 1];
+    return actor.hp + (actor.level) * 200 + (actor.level + 1) * 200 * (actor.exp / expToUpgrade) + actor.atk * 20 + actor.def * 20;
+  };
 
   while (true) {
     if (situations.length === 0) {
@@ -292,26 +297,38 @@ if (!command) {
 
     // 清理过时队伍
     let awaiting = situations.length, coefficient = 0.5;
-    if (awaiting > 100000) {
-      const totalHp = situations.map(situation => situation.actor).reduce((ac, cur) => ac + ((cur.level - 1) * 200 + cur.hp), 0);
-      const averageHp = totalHp / awaiting;
+    if (awaiting > 160000) {
+      const totalPoints = situations.map(situation => situation.actor).reduce((ac, cur) => ac + evaluate(cur), 0);
+      const averagePoints = totalPoints / awaiting;
 
-      while (awaiting > 100000) {
-        const baselineHp = averageHp * coefficient;
-        situations = situations.filter(situation => (situation.actor.level - 1) * 200 + situation.actor.hp >= baselineHp);
+      while (awaiting > 160000) {
+        const baselinePoints = averagePoints * coefficient;
+        situations = situations.filter(situation => evaluate(situation.actor) >= baselinePoints);
 
         filter += awaiting - situations.length;
         awaiting = situations.length;
         coefficient = coefficient * 1.025;
 
-        console.log("trigger filter, baselineHp:", baselineHp, "filter:", filter, "awaiting:", awaiting);
+        if (argv.debugFilter) {
+          console.log("trigger filter, baselinePoints:", baselinePoints, "filter:", filter, "awaiting:", awaiting);
+        }
       }
     }
 
     // 层数报告
     if (situation.graphs.size !== currentGraphCount) {
       currentGraphCount = situation.graphs.size;
-      console.log("graph size:", currentGraphCount, "awaiting:", situations.length, new Date(), situation.logs);
+
+      const candidates = [situation, ...situations];
+
+      let maxPoints = 0;
+      for (const candidate of candidates) {
+        maxPoints = Math.max(evaluate(candidate.actor), maxPoints);
+      }
+
+      const maxSituation = candidates.filter(situation => evaluate(situation.actor) === maxPoints);
+
+      console.log(new Date(), "graph size:", currentGraphCount, "awaiting:", situations.length, "filter:", filter, `\n${maxSituation[0].logs}`);
     }
 
     // 开始报告
@@ -329,7 +346,7 @@ if (!command) {
       switch (type) {
         case ItemType.ENEMY: {
           actor.fight(item as Enemy);
-          logs.push(`战胜了${(item as Enemy).name}；HP：${actor.hp} EXP：${actor.exp} GOLD：${actor.gold}`);
+          logs.push(`战胜了${(item as Enemy).name}；LEVEL: ${actor.level} HP：${actor.hp} EXP：${actor.exp} ATK: ${actor.atk} DEF: ${actor.def} GOLD：${actor.gold}`);
           situation.clearVisitedGraph();
           break;
         }
