@@ -37,4 +37,8 @@ export class Situation {
 
     return neo;
   }
+
+  clearVisitedGraph() {
+    this.visitedGraphs = new Set();
+  }
 }

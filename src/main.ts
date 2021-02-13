@@ -6,7 +6,7 @@ import {
   ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, make2DArray, saferOutputPath
 } from "./util";
 import {
-  Actor, DoorKeySubtype, Enemy, isBlockingItem, isPermanentItem, Item, MapSourceJSON
+  Actor, DoorKeySubtype, Enemy, getPotionEffect, isBlockingItem, isPermanentItem, Item, MapSourceJSON
 } from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
@@ -262,6 +262,8 @@ if (!command) {
   const situations = [initialSituation] as Array<Situation>;
   const solutions = [] as Array<Situation>;
   let trial = 0, deadEnd = 0;
+  let currentGraphCount = situations[0].graphs.size;
+  console.log(currentGraphCount, new Date());
 
   while (true) {
     if (situations.length === 0) {
@@ -274,13 +276,22 @@ if (!command) {
       }
       break;
     }
-
     ++trial;
 
+    if (solutions.length > 0) {
+      console.log(solutions[0].logs);
+      break;
+    }
+
     const situation = situations.shift() as Situation;
-    const currentGraph = situation.graphs.get(situation.currentGraphId) as Graph;
+    let currentGraph = situation.graphs.get(situation.currentGraphId) as Graph;
     const actor = situation.actor;
     const visitedGraphs = situation.visitedGraphs;
+
+    if (situation.graphs.size !== currentGraphCount) {
+      currentGraphCount = situation.graphs.size;
+      console.log(currentGraphCount, new Date(), situation.logs);
+    }
 
     // 开始报告
     const logs = [];
@@ -292,37 +303,47 @@ if (!command) {
     // 处理当前区域的物品
     for (let i = 0; i < currentGraph.items.length; ++i) {
       const item = currentGraph.items[i];
-      const { type, subtype } = item;
+      const { type } = item;
 
       switch (type) {
         case ItemType.ENEMY: {
           actor.fight(item as Enemy);
+          logs.push(`战胜了${(item as Enemy).name}；HP：${actor.hp} EXP：${actor.exp} GOLD：${actor.gold}`);
+          situation.clearVisitedGraph();
           break;
         }
 
         case ItemType.RED_GEM: {
+          const log = actor.handle(item);
+          logs.push(log);
+          situation.clearVisitedGraph();
           break;
         }
 
         case ItemType.BLUE_GEM: {
+          const log = actor.handle(item);
+          logs.push(log);
+          situation.clearVisitedGraph();
           break;
         }
 
         case ItemType.DOOR: {
+          const log = actor.handle(item);
+          logs.push(log);
           break;
         }
 
         case ItemType.KEY: {
-          switch (subtype) {
-            case DoorKeySubtype.YELLOW: actor.keyYellow++; break;
-            case DoorKeySubtype.BLUE: actor.keyBlue++; break;
-            case DoorKeySubtype.RED: actor.keyRed++; break;
-            default: throw new Error("Unable to handle this kind of key: " + subtype);
-          }
+          const log = actor.handle(item);
+          logs.push(log);
+          situation.clearVisitedGraph();
           break;
         }
 
         case ItemType.POTION: {
+          const log = actor.handle(item);
+          logs.push(log);
+          situation.clearVisitedGraph();
           break;
         }
 
@@ -343,19 +364,46 @@ if (!command) {
     }
 
     // 聚合连通分量
+    try {
+      if (situation.fromGraphId /** TODO && 是可以聚合的区块 */) {
+        const fromGraph = situation.graphs.get(situation.fromGraphId) as Graph;
+
+        for (const toGraphId of Array.from(currentGraph.connectedGraphs.values())) {
+          const toGraph = situation.graphs.get(toGraphId) as Graph;
+          fromGraph.connectedGraphs.add(toGraphId);
+          toGraph.connectedGraphs.add(fromGraph.graphId);
+          toGraph.connectedGraphs.delete(currentGraph.graphId);
+        }
+        fromGraph.connectedGraphs.delete(fromGraph.graphId);
+
+        situation.graphs.delete(currentGraph.graphId);
+
+        situation.currentGraphId = situation.fromGraphId;
+        currentGraph = fromGraph;
+      }
+    } catch (e) {
+      console.log(situation.logs);
+      throw e;
+    }
 
     // 决定下一步方向
     if (/* 如果是传送门并且目标位置没有访问过 */ false) {
       // 强制传送到目标地点
     } else {
-      const hasNext = false;
+      let hasNext = false;
 
       // 在相邻区块中选择方向
       for (const nextGraphId of Array.from(currentGraph.connectedGraphs)) {
         const nextGraph = situation.graphs.get(nextGraphId) as Graph;
         const firstItem = nextGraph.items[0];
 
-        console.log(nextGraphId, nextGraph);
+        if (!visitedGraphs.has(nextGraphId) && actor.couldHandle(firstItem)) {
+          const nextSituation = situation.clone();
+          nextSituation.fromGraphId = currentGraph.graphId;
+          nextSituation.currentGraphId = nextGraphId;
+          situations.push(nextSituation);
+          hasNext = true;
+        }
       }
 
       // 如果无法进行下一步则判定为困毙

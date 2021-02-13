@@ -70,7 +70,11 @@ export class Actor implements Fighter {
     return neo;
   }
 
-  couldHandle(item: Item): boolean {
+  couldHandle(item?: Item): boolean {
+    if (!item) {
+      return true;
+    }
+
     switch (item.type as ItemType) {
       case ItemType.DOOR: {
         switch (item.subtype as DoorKeySubtype) {
@@ -135,14 +139,17 @@ export class Actor implements Fighter {
       case ItemType.KEY: {
         switch (item.subtype) {
           case DoorKeySubtype.YELLOW: {
+            this.keyYellow++;
             return `拾获黄钥匙，现有${this.keyYellow}`;
           }
 
           case DoorKeySubtype.BLUE: {
+            this.keyBlue++;
             return `拾获蓝钥匙，现有${this.keyBlue}`;
           }
 
           case DoorKeySubtype.RED: {
+            this.keyRed;
             return `拾获红钥匙，现有${this.keyRed}`;
           }
         }
@@ -165,6 +172,8 @@ export class Actor implements Fighter {
   }
 
   fight(enemy: Enemy): void {
+    enemy = Object.assign({}, enemy);
+
     // “我们未能击穿敌人的装甲”
     if (this.atk < enemy.def) {
       this.hp = 0;
@@ -200,7 +209,7 @@ export class Actor implements Fighter {
     if (isFighting) {
       let actorIsAttacker = true; // 玩家总是先手
 
-      while (true) {
+      while (isFighting) {
         const attacker: Fighter = actorIsAttacker ? this : enemy;
         const defender: Fighter = actorIsAttacker ? enemy : this;
 
