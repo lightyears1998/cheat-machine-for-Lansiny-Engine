@@ -1,9 +1,5 @@
-import { inspect } from "util";
-import { SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION } from "constants";
-
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
-import { updateTypeLiteralNode } from "typescript";
 
 import {
   directionVector,

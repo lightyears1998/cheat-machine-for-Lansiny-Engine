@@ -2,7 +2,7 @@
   "name": "cheat-engine-for-lansiny-engine",
   "version": "1.0.0",
   "description": "Lansiny 的游戏实在是太难了。🤣",
-  "main": "src/main.ts",
+  "main": "src/index.ts",
   "repository": "https://github.com/lightyears1998/CheatEngineForLansinyEngine.git",
   "author": "lightyears <lightyears1998@hotmail.com>",
   "license": "MIT",

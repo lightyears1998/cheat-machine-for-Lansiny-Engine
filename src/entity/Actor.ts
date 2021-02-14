@@ -242,7 +242,7 @@ export class Actor implements Fighter {
     }
   }
 
-  levelUp() {
+  levelUp(): void {
     this.hp += this.level * 200 + Math.floor((this.hp * 20) / 100);
     this.atk += Number(this.level) + Math.floor((this.atk * 10) / 100);
     this.def += Number(this.level) + Math.floor((this.def * 10) / 100);

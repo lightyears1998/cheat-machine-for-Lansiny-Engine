@@ -44,6 +44,7 @@ type SkillData = {
   afterBattle: Record<string, AfterBattleSkillFunc>
 }
 
+/* eslint-disable */
 export const skillData: SkillData = {
   beforeBattle: {
     "": function (a, b) {
