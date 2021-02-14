@@ -1,7 +1,7 @@
 import yargs from "yargs/yargs";
 
 import { hideBin } from "./util";
-import { buildMap } from "./map-converter";
+import { convertMap } from "./map-converter";
 import { buildGame } from "./game-builder";
 import { runGame } from "./game-runner";
 
@@ -17,8 +17,8 @@ async function bootstrap() {
   }
 
   switch (command) {
-    case "buildMap": {
-      buildMap(argv);
+    case "convertMap": {
+      convertMap(argv);
       break;
     }
 

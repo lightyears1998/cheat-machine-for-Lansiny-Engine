@@ -8,6 +8,6 @@ export * from "./Actor";
 export * from "./Enemy";
 export * from "./GameMap";
 export * from "./MapBlock";
-export * from "./MapSourceJSON";
+export * from "./UpsteamMapJSON";
 export * from "./Situation";
 export * from "./Graph";

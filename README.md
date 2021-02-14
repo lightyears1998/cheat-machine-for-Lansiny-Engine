@@ -4,7 +4,7 @@
 
 ``` shell
 # 转换地图
-yarn start buildMap --auto-truncate
+yarn start convertMap
 
 # 生成游戏
 yarn start buildGame --map var/Map011.yml --initial "(11,0,6)" --target "(11,10,6)" var/Game01.yml

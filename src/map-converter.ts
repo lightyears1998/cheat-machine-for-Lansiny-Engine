@@ -1,101 +1,103 @@
-import fs from "fs-extra";
-import { Arguments, Argv } from "yargs";
+import path from "path";
 
-import {
-  directionVector,
-  ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, make2DArray, saferOutputPath
-} from "./util";
-import {
-  Actor, cumulativeExpRequiredForLevelUp, Enemy, isBlockingItem, isBuffOrToolItem, isPermanentItem, MapSourceJSON
-} from "./entity";
+import fs from "fs-extra";
+import { Arguments } from "yargs";
+
+import { UpstreamMap } from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
-import { Game } from "./entity/Game";
-import { Situation } from "./entity/Situation";
-import { Graph } from "./entity/Graph";
-import { ItemType } from "./entity/ItemType";
+import { UpstreamMapInfo, UpstreamMapInfos } from "./entity/UpstreamMapInfosJSON";
 
-const argv: Record<string, any> = { _: ["", ""] };
+export function convertMap(argv: Arguments) {
+  const autoTruncate = (argv.autoTruncate ?? true) as boolean;
 
-export function buildMap(argv: Arguments) {
-  let source = argv._.shift();
-  let output = argv._.shift();
-  [source, output] = ensureSourceAndOutput(source, output);
-  saferOutputPath(output);
+  const mapInfos = readMapInfos().filter(info => info != null) as Array<UpstreamMapInfo>;
 
-  const autoTruncate = argv.autoTruncate as boolean;
+  for (const info of mapInfos) {
+    const { id, name } = info;
+    const basename = `Map${String(id).padStart(3, "0")}`;
 
-  const sourceMapFile = fs.readFileSync(source, { encoding: "utf-8" });
-  const sourceMapJSON: MapSourceJSON = JSON.parse(sourceMapFile);
+    const sourceFile = path.resolve(__dirname, `../var/upstream/${basename}.json`);
+    const outputFile = path.resolve(__dirname, `../var/${basename}.yml`);
 
-  const {
-    height, width, data, events
-  } = sourceMapJSON;
-  let map: GameMap;
+    const sourceMap = fs.readFileSync(sourceFile, { encoding: "utf-8" });
+    const sourceJSON: UpstreamMap = JSON.parse(sourceMap);
 
-  let [
-    startX,
-    startY,
-    endX,
-    endY
-  ] = [
-    0,
-    0,
-    height - 1,
-    width - 1
-  ] as number[];
+    const {
+      height, width, data, events
+    } = sourceJSON;
+    let map: GameMap;
 
-  if (autoTruncate) {
-    // GameMap.data 数组长度 6 * height * width
-    // 偏移量 3 * height * width 处为地图图层，可获知图块可否穿过。
-    let started = false, ended = false;
+    let [
+      startX,
+      startY,
+      endX,
+      endY
+    ] = [
+      0,
+      0,
+      height - 1,
+      width - 1
+    ] as number[];
 
-    for (let i = 0; i < height && !started; ++i) {
-      for (let j = 0; j < width && !started; ++j) {
-        const datum = data[3 * height * width + i * width + j];
-        if (datum !== 0) {
-          startX = i, startY = j;
-          started = true;
+    if (autoTruncate) {
+      // GameMap.data 数组长度 6 * height * width
+      // 偏移量 3 * height * width 处为地图图层，可获知图块可否穿过。
+      let started = false, ended = false;
+
+      for (let i = 0; i < height && !started; ++i) {
+        for (let j = 0; j < width && !started; ++j) {
+          const datum = data[3 * height * width + i * width + j];
+          if (datum !== 0) {
+            startX = i, startY = j;
+            started = true;
+          }
+        }
+      }
+
+      for (let i = height - 1; i >= 0 && !ended; --i) {
+        for (let j = width - 1; j >= 0 && !ended; --j) {
+          const datum = data[4 * height * width - 1 - (width - 1 - j) - width * (height - 1 - i)];
+          if (datum !== 0) {
+            endX = i, endY = j;
+            ended = true;
+          }
+        }
+      }
+
+      const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
+      map = new GameMap(id, name, actualHeight, actualWidth, { originHeight: height, originWidth: width });
+
+    } else {
+      map = new GameMap(id, name, height, width, { originHeight: height, originWidth: width });
+    }
+
+    const blocks = map.blocks;
+    const passableBlocks = [584];
+    for (let i = 0; i <= endX - startX; ++i) {
+      for (let j = 0; j <= endY - startY; ++j) {
+        const pos = 3 * height * width + width * (startX + i) + startY + j;
+        blocks[i][j] = new MapBlock(i, j, passableBlocks.includes(data[pos]));
+      }
+    }
+
+    for (const event of events) {
+      if (event != null) {
+        const { x, y } = event;
+        const [i, j] = [y, x];
+
+        if (startX <= i && i <= endX && startY <= j && j <= endY) {
+          const item = identifyItem(event);
+          blocks[i - startX][j - startY].item = item;
         }
       }
     }
 
-    for (let i = height - 1; i >= 0 && !ended; --i) {
-      for (let j = width - 1; j >= 0 && !ended; --j) {
-        const datum = data[4 * height * width - 1 - (width - 1 - j) - width * (height - 1 - i)];
-        if (datum !== 0) {
-          endX = i, endY = j;
-          ended = true;
-        }
-      }
-    }
-
-    const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
-    map = new GameMap(11, actualHeight, actualWidth);
-
-  } else {
-    map = new GameMap(11, height, width);
+    fs.writeFileSync(outputFile, GameMap.dump(map));
   }
+}
 
-  const blocks = map.blocks;
-  for (let i = 0; i <= endX - startX; ++i) {
-    for (let j = 0; j <= endY - startY; ++j) {
-      const pos = 3 * height * width + width * (startX + i) + startY + j;
-      blocks[i][j] = new MapBlock(i, j, data[pos] === 584);
-    }
-  }
-
-  for (const event of events) {
-    if (event != null) {
-      const { x, y } = event;
-      const [i, j] = [y, x];
-
-      if (startX <= i && i <= endX && startY <= j && j <= endY) {
-        const item = identifyItem(event);
-        blocks[i - startX][j - startY].item = item;
-      }
-    }
-  }
-
-  fs.writeFileSync(output, GameMap.dump(map));
+function readMapInfos(): UpstreamMapInfos {
+  const mapInfoJSON = fs.readFileSync(path.resolve(__dirname, "../var/upstream/MapInfos.json"), { encoding: "utf8" });
+  return JSON.parse(mapInfoJSON);
 }

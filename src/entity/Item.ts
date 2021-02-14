@@ -1,4 +1,4 @@
-import { MapEvent } from "./MapSourceJSON";
+import { UpstreamMapEvent } from "./UpsteamMapJSON";
 import { ItemType } from "./ItemType";
 
 import {
@@ -14,7 +14,7 @@ export class Item {
   }
 }
 
-export function identifyItem(event: MapEvent): Item | undefined {
+export function identifyItem(event: UpstreamMapEvent): Item | undefined {
   const [name] = event.name.split(" ");
   const { note } = event;
 
@@ -30,6 +30,10 @@ export function identifyItem(event: MapEvent): Item | undefined {
                   return Item.create({ type: ItemType.POTION, subtype: PotionRank.LV1 });
                 } else if (rank === 2) {
                   return Item.create({ type: ItemType.POTION, subtype: PotionRank.LV2 });
+                } else if (rank === 3) {
+                  return Item.create({ type: ItemType.POTION, subtype: PotionRank.LV3 });
+                } else if (rank === 4) {
+                  return Item.create({ type: ItemType.POTION, subtype: PotionRank.LV4 });
                 }
                 throw new Error("unknown Potion Level: " + JSON.stringify(entry));
               }

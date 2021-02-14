@@ -1,4 +1,4 @@
-export type MapEvent = {
+export type UpstreamMapEvent = {
   id: number
   name: string
   note: string
@@ -12,9 +12,9 @@ export type MapEvent = {
   }>
 }
 
-export type MapSourceJSON = {
+export type UpstreamMap = {
   width: number,
   height: number,
   data: number[],
-  events: Array<MapEvent | null>
+  events: Array<UpstreamMapEvent | null>
 }
