@@ -12,6 +12,10 @@ export class Situation {
 
   logs = ""
 
+  get currentGraph(): Graph {
+    return this.getGraphById(this.currentGraphId);
+  }
+
   static create({
     currentGraphId, maps, graphs
   }: Pick<Situation, "currentGraphId" | "maps" | "graphs">): Situation {
@@ -38,7 +42,11 @@ export class Situation {
     return neo;
   }
 
-  clearVisitedGraph() {
+  getGraphById(graphId: number): Graph {
+    return this.graphs.get(graphId) as Graph;
+  }
+
+  clearVisitedGraph(): void {
     this.visitedGraphs = new Set();
   }
 }

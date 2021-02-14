@@ -1,14 +1,16 @@
-import { strictEqual } from "assert";
+import { inspect } from "util";
+import { SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION } from "constants";
 
 import yargs from "yargs/yargs";
 import fs from "fs-extra";
+import { updateTypeLiteralNode } from "typescript";
 
 import {
   directionVector,
   ensureSourceAndOutput, getInitialAndTargetLocation, hideBin, make2DArray, saferOutputPath
 } from "./util";
 import {
-  Actor, cumulativeExpRequiredForLevelUp, DoorKeySubtype, Enemy, getPotionEffect, isBlockingItem, isPermanentItem, Item, MapSourceJSON
+  Actor, cumulativeExpRequiredForLevelUp, Enemy, isBlockingItem, isBuffOrToolItem, isPermanentItem, MapSourceJSON
 } from "./entity";
 import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
@@ -78,10 +80,10 @@ if (!command) {
     }
 
     const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
-    map = new GameMap(10, actualHeight, actualWidth);
+    map = new GameMap(11, actualHeight, actualWidth);
 
   } else {
-    map = new GameMap(10, height, width);
+    map = new GameMap(11, height, width);
   }
 
   const blocks = map.blocks;
@@ -244,6 +246,7 @@ if (!command) {
     if (!game.initialGraphId || !game.targetGraphId) {
       throw new Error("Fail to determine initial graph or target graph");
     }
+    initialSituation.getGraphById(game.targetGraphId).couldBeMerged = false;
 
     // 收集区块内的物品
     for (let i = 0; i < height; ++i) {
@@ -260,87 +263,24 @@ if (!command) {
     }
   }
 
-  // 开始推理
+  // 推理过程
   let situations = [initialSituation] as Array<Situation>;
   const solutions = [] as Array<Situation>;
   let trial = 0, filter = 0, deadEnd = 0;
-  let currentGraphCount = situations[0].graphs.size;
-  console.log(new Date(), "Origin graph size:", currentGraphCount);
+  let minGraphCount = situations[0].graphs.size;
+  console.log(new Date(), "Origin graph size:", minGraphCount);
 
   const evaluate = (actor: Actor): number => {
     const expToUpgrade = cumulativeExpRequiredForLevelUp[actor.level + 1];
     return actor.hp + (actor.level) * 200 + (actor.level + 1) * 200 * (actor.exp / expToUpgrade) + actor.atk * 20 + actor.def * 20;
   };
 
-  while (true) {
-    if (situations.length === 0) {
-      if (solutions.length > 0) {
-        console.log("Found solution!");
-        console.log(solutions[0].logs);
-        console.log("Possible solutions:", situations.length, "\ttrial:", trial, "\tdead end:", deadEnd);
-      } else {
-        console.log("Sorry but I can't find a solution.", "\ttrial:", trial, "\tdead end:", deadEnd, "\tfilter", filter);
-      }
-      break;
-    }
-    ++trial;
-
-    if (solutions.length > 0) {
-      console.log(solutions[0].logs);
-      break;
-    }
-
-    const situation = situations.shift() as Situation;
-    let currentGraph = situation.graphs.get(situation.currentGraphId) as Graph;
+  const handleGraphItems = (situation: Situation, graphId: number, logs: string[]) => {
     const actor = situation.actor;
-    const visitedGraphs = situation.visitedGraphs;
+    const graph = situation.getGraphById(graphId);
 
-    // 清理过时队伍
-    let awaiting = situations.length, coefficient = 0.5;
-    if (awaiting > 160000) {
-      const totalPoints = situations.map(situation => situation.actor).reduce((ac, cur) => ac + evaluate(cur), 0);
-      const averagePoints = totalPoints / awaiting;
-
-      while (awaiting > 160000) {
-        const baselinePoints = averagePoints * coefficient;
-        situations = situations.filter(situation => evaluate(situation.actor) >= baselinePoints);
-
-        filter += awaiting - situations.length;
-        awaiting = situations.length;
-        coefficient = coefficient * 1.025;
-
-        if (argv.debugFilter) {
-          console.log("trigger filter, baselinePoints:", baselinePoints, "filter:", filter, "awaiting:", awaiting);
-        }
-      }
-    }
-
-    // 层数报告
-    if (situation.graphs.size !== currentGraphCount) {
-      currentGraphCount = situation.graphs.size;
-
-      const candidates = [situation, ...situations];
-
-      let maxPoints = 0;
-      for (const candidate of candidates) {
-        maxPoints = Math.max(evaluate(candidate.actor), maxPoints);
-      }
-
-      const maxSituation = candidates.filter(situation => evaluate(situation.actor) === maxPoints);
-
-      console.log(new Date(), "graph size:", currentGraphCount, "awaiting:", situations.length, "filter:", filter, `\n${maxSituation[0].logs}`);
-    }
-
-    // 开始报告
-    const logs = [];
-
-    // 记录到达位置
-    visitedGraphs.add(currentGraph.graphId);
-    logs.push(`移动到${currentGraph.firstItemLocation} (${currentGraph.graphId})`);
-
-    // 处理当前区域的物品
-    for (let i = 0; i < currentGraph.items.length; ++i) {
-      const item = currentGraph.items[i];
+    for (let i = 0; i < graph.items.length; ++i) {
+      const item = graph.items[i];
       const { type } = item;
 
       switch (type) {
@@ -390,39 +330,134 @@ if (!command) {
     }
 
     // 销毁不是永久物品的物品
-    currentGraph.items = currentGraph.items.filter(item => isPermanentItem(item));
+    graph.items = graph.items.filter(item => isPermanentItem(item));
+  };
 
-    // 结束报告
-    situation.logs += "# " + logs.join("；") + "\n";
+  const mergeGraphs = (situation: Situation, baseGraphId: number, branchGraphId: number) => {
+    const baseGraph = situation.graphs.get(baseGraphId) as Graph;
+    const branchGraph = situation.graphs.get(branchGraphId) as Graph;
+
+    if (!branchGraph.couldBeMerged) {
+      throw "目标区块不可被合并。";
+    }
+
+    for (const toGraphId of Array.from(branchGraph.connectedGraphs.values())) {
+      const toGraph = situation.graphs.get(toGraphId) as Graph;
+      baseGraph.connectedGraphs.add(toGraphId);
+      toGraph.connectedGraphs.add(baseGraph.graphId);
+      toGraph.connectedGraphs.delete(branchGraph.graphId);
+    }
+    baseGraph.connectedGraphs.delete(baseGraph.graphId);
+
+    situation.graphs.delete(branchGraph.graphId);
+
+    situation.currentGraphId = baseGraphId;
+  };
+
+  while (true) {
+    if (situations.length === 0) {
+      if (solutions.length > 0) {
+        console.log("Found solution!");
+        solutions.sort((a, b) => -(evaluate(a.actor) - evaluate(b.actor)));
+        console.log("Possible solutions:", solutions.length, "\ttrial:", trial, "\tdead end:", deadEnd);
+
+        const hpSet = new Set();
+        for (let i = 0; i < solutions.length; ++i) {
+          const hp = solutions[i].actor.hp;
+          if (!hpSet.has(hp)) {
+            console.log("final hp:", hp, solutions[i].logs);
+            hpSet.add(hp);
+          }
+        }
+      } else {
+        console.log("Sorry but I can't find a solution.", "\ttrial:", trial, "\tdead end:", deadEnd, "\tfilter", filter);
+      }
+      break;
+    }
+    ++trial;
+
+    const situation = situations.shift() as Situation;
+
+    // 清理情况较差的分支
+    if (situations.length > 160000) {
+      let awaiting = situations.length, coefficient = 0.5;
+      const totalPoints = situations.map(situation => situation.actor).reduce((ac, cur) => ac + evaluate(cur), 0);
+      const averagePoints = totalPoints / awaiting;
+
+      while (awaiting > 160000) {
+        const baselinePoints = averagePoints * coefficient;
+        situations = situations.filter(situation => evaluate(situation.actor) >= baselinePoints);
+
+        filter += awaiting - situations.length;
+        awaiting = situations.length;
+        coefficient = coefficient * 1.025;
+
+        if (argv.debugFilter) {
+          console.log("filtering, baselinePoints:", baselinePoints, "filter:", filter, "awaiting:", awaiting);
+        }
+      }
+    }
+
+    // 层数报告
+    if (Math.min(situation.graphs.size, minGraphCount) !== minGraphCount) {
+      minGraphCount = situation.graphs.size;
+
+      const candidates = [situation, ...situations];
+
+      let maxPoints = 0;
+      for (const candidate of candidates) {
+        maxPoints = Math.max(evaluate(candidate.actor), maxPoints);
+      }
+
+      const maxSituation = candidates.filter(situation => evaluate(situation.actor) === maxPoints);
+
+      console.log(new Date(), "graph size:", minGraphCount, "awaiting:", situations.length, "filter:", filter, `\n${maxSituation[0].logs}`);
+    }
+
+    // 开始报告
+    const logs = [];
+
+    // 记录到达位置
+    logs.push(`移动到${situation.currentGraph.firstItemLocation} (id: ${situation.currentGraphId})`);
+
+    // 处理当前区域的物品
+    handleGraphItems(situation, situation.currentGraphId, logs);
 
     // 判断当前是否位于目标区域
+    situation.visitedGraphs.add(situation.currentGraphId);
     if (situation.currentGraphId === game.targetGraphId) {
       solutions.push(situation);
       continue;
     }
 
     // 聚合连通分量
-    try {
-      if (situation.fromGraphId /** TODO && 是可以聚合的区块 */) {
-        const fromGraph = situation.graphs.get(situation.fromGraphId) as Graph;
-
-        for (const toGraphId of Array.from(currentGraph.connectedGraphs.values())) {
-          const toGraph = situation.graphs.get(toGraphId) as Graph;
-          fromGraph.connectedGraphs.add(toGraphId);
-          toGraph.connectedGraphs.add(fromGraph.graphId);
-          toGraph.connectedGraphs.delete(currentGraph.graphId);
-        }
-        fromGraph.connectedGraphs.delete(fromGraph.graphId);
-
-        situation.graphs.delete(currentGraph.graphId);
-
-        situation.currentGraphId = situation.fromGraphId;
-        currentGraph = fromGraph;
-      }
-    } catch (e) {
-      console.log(situation.logs);
-      throw e;
+    if (situation.fromGraphId && situation.currentGraph.couldBeMerged /** TODO && 是可以聚合的区块 */) {
+      mergeGraphs(situation, situation.fromGraphId, situation.currentGraphId);
     }
+
+    // 拓张到相邻区块
+    while (true) {
+      let mergedCount = 0;
+
+      for (const nearGraphId of Array.from(situation.currentGraph.connectedGraphs.values())) {
+        const nearGraph = situation.getGraphById(nearGraphId);
+        if (!situation.visitedGraphs.has(nearGraphId) && (!nearGraph.items[0] || isBuffOrToolItem(nearGraph.items[0]))) {
+          if (nearGraph.couldBeMerged) {
+            handleGraphItems(situation, nearGraphId, logs);
+            mergeGraphs(situation, situation.currentGraphId, nearGraphId);
+            situation.visitedGraphs.add(nearGraphId);
+            ++mergedCount;
+          }
+        }
+      }
+
+      if (mergedCount === 0) {
+        break;
+      }
+    }
+
+    // 结束报告
+    situation.logs += "# " + logs.join("；") + "\n";
 
     // 决定下一步方向
     if (/* 如果是传送门并且目标位置没有访问过 */ false) {
@@ -431,13 +466,13 @@ if (!command) {
       let hasNext = false;
 
       // 在相邻区块中选择方向
-      for (const nextGraphId of Array.from(currentGraph.connectedGraphs)) {
-        const nextGraph = situation.graphs.get(nextGraphId) as Graph;
+      for (const nextGraphId of Array.from(situation.currentGraph.connectedGraphs)) {
+        const nextGraph = situation.getGraphById(nextGraphId);
         const firstItem = nextGraph.items[0];
 
-        if (!visitedGraphs.has(nextGraphId) && actor.couldHandle(firstItem)) {
+        if (!situation.visitedGraphs.has(nextGraphId) && situation.actor.couldHandle(firstItem)) {
           const nextSituation = situation.clone();
-          nextSituation.fromGraphId = currentGraph.graphId;
+          nextSituation.fromGraphId = situation.currentGraph.graphId;
           nextSituation.currentGraphId = nextGraphId;
           situations.push(nextSituation);
           hasNext = true;

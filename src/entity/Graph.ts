@@ -7,6 +7,7 @@ export class Graph {
 
   items: Item[] = []
   connectedGraphs: Set<number> = new Set()
+  couldBeMerged = true
 
   clone(): Graph {
     const neo = new Graph();
@@ -15,6 +16,7 @@ export class Graph {
     neo.firstItemLocation = this.firstItemLocation;
     neo.items = this.items.slice();
     neo.connectedGraphs = new Set(Array.from(this.connectedGraphs.values()));
+    neo.couldBeMerged = this.couldBeMerged;
 
     return neo;
   }

@@ -7,7 +7,7 @@
 yarn start buildMapFromJSON var/upstream/Map011.json var/Map011.yml --auto-truncate
 
 # 生成游戏
-yarn start buildGame --map var/Map011.yml --initial "(10,0,6)" --target "(10,11,6)" var/Game01.yml
+yarn start buildGame --map var/Map011.yml --initial "(11,0,6)" --target "(11,10,6)" var/Game01.yml
 
 # 计算策略
 yarn start run --game var/Game01.yml

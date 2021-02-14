@@ -120,6 +120,15 @@ export function isBlockingItem(item?: Item): boolean {
   return item.type === ItemType.ENEMY || item.type === ItemType.DOOR;
 }
 
+export function isBuffOrToolItem(item?: Item): boolean {
+  if (!item) {
+    return false;
+  }
+
+  const itemType = item.type;
+  return itemType === ItemType.RED_GEM || itemType === ItemType.BLUE_GEM || itemType === ItemType.KEY || itemType === ItemType.POTION;
+}
+
 export function isPermanentItem(item: Item): boolean {
   return false;
 }
