@@ -77,6 +77,11 @@
   dependencies:
     defer-to-connect "^1.0.1"
 
+"@types/d3@^3":
+  version "3.5.44"
+  resolved "https://registry.npm.taobao.org/@types/d3/download/@types/d3-3.5.44.tgz#28635f8bb9adf1cef5bbef2b06778174a9d34383"
+  integrity sha1-KGNfi7mt8c71u+8rBneBdKnTQ4M=
+
 "@types/fs-extra@^9.0.6":
   version "9.0.6"
   resolved "https://registry.npm.taobao.org/@types/fs-extra/download/@types/fs-extra-9.0.6.tgz?cache=0&other_urls=https%3A%2F%2Fregistry.npm.taobao.org%2F%40types%2Ffs-extra%2Fdownload%2F%40types%2Ffs-extra-9.0.6.tgz#488e56b77299899a608b8269719c1d133027a6ab"
@@ -108,6 +113,13 @@
   version "14.14.26"
   resolved "https://registry.npm.taobao.org/@types/node/download/@types/node-14.14.26.tgz#e40df24c957568f350cca04e63bfb1e1556d1cbf"
   integrity sha1-5A3yTJV1aPNQzKBOY7+x4VVtHL8=
+
+"@types/plotly.js@^1.54.7":
+  version "1.54.7"
+  resolved "https://registry.npm.taobao.org/@types/plotly.js/download/@types/plotly.js-1.54.7.tgz#db784d781e17d66482cee91ea5e72d61589ab043"
+  integrity sha1-23hNeB4X1mSCzukepectYViasEM=
+  dependencies:
+    "@types/d3" "^3"
 
 "@types/strip-bom@^3.0.0":
   version "3.0.0"
@@ -1600,6 +1612,13 @@ nodemon@^2.0.7:
     touch "^3.1.0"
     undefsafe "^2.0.3"
     update-notifier "^4.1.0"
+
+nodeplotlib@^0.7.3:
+  version "0.7.3"
+  resolved "https://registry.npm.taobao.org/nodeplotlib/download/nodeplotlib-0.7.3.tgz#dc278846e48c10aa9b79ee5fd954e370113ac887"
+  integrity sha1-3CeIRuSMEKqbee5f2VTjcBE6yIc=
+  dependencies:
+    "@types/plotly.js" "^1.54.7"
 
 nopt@~1.0.10:
   version "1.0.10"

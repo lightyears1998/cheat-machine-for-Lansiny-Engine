@@ -17,15 +17,16 @@ export function convertMap(argv: Arguments) {
     const { id, name } = info;
     const basename = `Map${String(id).padStart(3, "0")}`;
 
-    const sourceFile = path.resolve(__dirname, `../var/upstream/${basename}.json`);
-    const outputFile = path.resolve(__dirname, `../var/${basename}.yml`);
+    const sourceMapFilepath = path.resolve(__dirname, `../var/upstream/${basename}.json`);
+    const outputMapFilepath = path.resolve(__dirname, `../var/${basename}.yml`);
 
-    const sourceMap = fs.readFileSync(sourceFile, { encoding: "utf-8" });
-    const sourceJSON: UpstreamMap = JSON.parse(sourceMap);
+    const sourceMapFile = fs.readFileSync(sourceMapFilepath, { encoding: "utf-8" });
+    const sourceMap: UpstreamMap = JSON.parse(sourceMapFile);
 
     const {
       height, width, data, events
-    } = sourceJSON;
+    } = sourceMap;
+
     let map: GameMap;
 
     let [
@@ -41,10 +42,10 @@ export function convertMap(argv: Arguments) {
     ] as number[];
 
     if (autoTruncate) {
-      // GameMap.data 数组长度 6 * height * width
-      // 偏移量 3 * height * width 处为地图图层，可获知图块可否穿过。
       let started = false, ended = false;
 
+      // GameMap.data 数组长度 6 * height * width
+      // 偏移量 3 * height * width 处为地图图层，可获知图块可否穿过。
       for (let i = 0; i < height && !started; ++i) {
         for (let j = 0; j < width && !started; ++j) {
           const datum = data[3 * height * width + i * width + j];
@@ -67,7 +68,6 @@ export function convertMap(argv: Arguments) {
 
       const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
       map = new GameMap(id, name, actualHeight, actualWidth, { originHeight: height, originWidth: width });
-
     } else {
       map = new GameMap(id, name, height, width, { originHeight: height, originWidth: width });
     }
@@ -93,7 +93,7 @@ export function convertMap(argv: Arguments) {
       }
     }
 
-    fs.writeFileSync(outputFile, GameMap.dump(map));
+    fs.writeFileSync(outputMapFilepath, GameMap.dump(map));
   }
 }
 

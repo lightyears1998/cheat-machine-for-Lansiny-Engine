@@ -1,18 +1,25 @@
+import path from "path";
+
 import { Arguments } from "yargs";
 import fs from "fs-extra";
+import { isNumberString } from "class-validator";
 
 import { Actor, GameMap } from "./entity";
-import { getInitialAndTargetLocation, saferOutputPath } from "./util";
+import { getInitialAndTargetLocation } from "./util";
 import { Game } from "./entity/Game";
 
 export function buildGame(argv: Arguments) {
-  const mapPaths = Array.isArray(argv.map) ? argv.map : [argv.map];
+  const mapIdsString = String(argv.map);
+  const mapIds = mapIdsString.split("").filter(ch => isNumberString(ch) || ch === ",").join("").replace(/,/g, " ").replace(/\s+/g, " ").split(" ").map(id => Number(id));
+
   const [initial, target] = getInitialAndTargetLocation(String(argv.initial), String(argv.target));
-  const output = saferOutputPath(String(argv._.shift()));
+  const gameName = String(argv._.shift());
+  const gamePath = path.resolve(__dirname, `../var/${gameName}.yml`);
 
   const maps = [];
-  for (const path of mapPaths) {
-    const map = GameMap.load(fs.readFileSync(path, { encoding: "utf-8" }));
+  for (const mapId of mapIds) {
+    const mapPath = path.resolve(__dirname, `../var/Map${String(mapId).padStart(3, "0")}.yml`);
+    const map = GameMap.load(fs.readFileSync(mapPath, { encoding: "utf-8" }));
     maps.push(map);
   }
 
@@ -22,5 +29,5 @@ export function buildGame(argv: Arguments) {
     maps, initialLocation: initial, targetLocation: target, actor
   });
 
-  fs.writeFileSync(output, Game.dump(game));
+  fs.writeFileSync(gamePath, Game.dump(game));
 }

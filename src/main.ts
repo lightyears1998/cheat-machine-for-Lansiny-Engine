@@ -27,7 +27,7 @@ async function bootstrap() {
       break;
     }
 
-    case "runGame": {
+    case "run": {
       runGame(argv);
       break;
     }

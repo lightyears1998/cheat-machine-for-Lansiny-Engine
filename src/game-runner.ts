@@ -1,3 +1,5 @@
+import path from "path";
+
 import { Arguments } from "yargs";
 import fs from "fs-extra";
 
@@ -8,7 +10,8 @@ import {
 import { directionVector, make2DArray } from "./util";
 
 export function runGame(argv: Arguments) {
-  const gamePath = String(argv.game);
+  const gameName = String(argv._.shift());
+  const gamePath = path.resolve(__dirname, `../var/${gameName}.yml`);
   const game = Game.load(fs.readFileSync(gamePath, { encoding: "utf-8" }));
 
   // 处理初始情况
