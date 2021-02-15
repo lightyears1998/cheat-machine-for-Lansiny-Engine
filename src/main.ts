@@ -4,6 +4,7 @@ import { hideBin } from "./util";
 import { convertMap } from "./map-converter";
 import { buildGame } from "./game-builder";
 import { runGame } from "./game-runner";
+import { inspectMap } from "./map-tools";
 
 const helpMessage = "请看 README";
 
@@ -19,6 +20,11 @@ async function bootstrap() {
   switch (command) {
     case "convertMap": {
       convertMap(argv);
+      break;
+    }
+
+    case "inspectMap": {
+      inspectMap(argv);
       break;
     }
 

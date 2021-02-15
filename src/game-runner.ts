@@ -16,12 +16,12 @@ export function runGame(argv: Arguments) {
 
   // 处理初始情况
   const initialSituation = new Situation();
-  initialSituation.actor = new Actor();
+  initialSituation.actor = Actor.create(game.actor);
 
   // 注册地图 ID
   game.maps.map(map => map.mapId).forEach(id => initialSituation.maps.add(id));
 
-  // 对地图的每一部分进行连通分量分析
+  // 注册连通分量
   const graphMap = initialSituation.graphs;
 
   let nextGraphId = 1;
@@ -43,6 +43,7 @@ export function runGame(argv: Arguments) {
     graphB.connectedGraphs.add(graphIdA);
   };
 
+  // 对每张地图进行连通分量分析
   for (const map of game.maps) {
     const {
       mapId, height, width, blocks
