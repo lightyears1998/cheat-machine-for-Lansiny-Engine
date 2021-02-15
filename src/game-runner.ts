@@ -1,15 +1,16 @@
 import path from "path";
 
+import { table } from "table";
 import { Arguments } from "yargs";
 import fs from "fs-extra";
 
 import { Game } from "./entity/Game";
 import {
-  Actor, cumulativeExpRequiredForLevelUp, Enemy, Graph, isBlockingItem, isBuffOrToolItem, isPermanentItem, ItemType, Situation
+  Actor, cumulativeExpRequiredForLevelUp, Enemy, Graph, isBlockingItem, isBuffOrToolItem, ItemType, Portal, Situation
 } from "./entity";
 import { directionVector, make2DArray } from "./util";
 
-export function runGame(argv: Arguments) {
+export function runGame(argv: Arguments): void {
   const gameName = String(argv._.shift());
   const gamePath = path.resolve(__dirname, `../var/${gameName}.yml`);
   const game = Game.load(fs.readFileSync(gamePath, { encoding: "utf-8" }));
@@ -49,7 +50,7 @@ export function runGame(argv: Arguments) {
       mapId, height, width, blocks
     } = map;
 
-    const graphIdMarks = make2DArray(height, width, 0);
+    const graphIdMarks = map.graphIdMarks = make2DArray(height, width, 0);
     for (let i = 0; i < height; ++i) {
       for (let j = 0; j < width; ++j) {
         if (!blocks[i][j].isPassable || graphIdMarks[i][j] !== 0) {
@@ -87,7 +88,8 @@ export function runGame(argv: Arguments) {
     }
 
     if (argv.debugMark) {
-      console.log(graphIdMarks);
+      console.log(map.name, map.mapId);
+      console.log(table(graphIdMarks));
     }
 
     if (argv.debugGraph) {
@@ -129,11 +131,6 @@ export function runGame(argv: Arguments) {
       }
     }
 
-    if (!game.initialGraphId || !game.targetGraphId) {
-      throw new Error("Fail to determine initial graph or target graph");
-    }
-    initialSituation.getGraphById(game.targetGraphId).couldBeMerged = false;
-
     // 收集区块内的物品
     for (let i = 0; i < height; ++i) {
       for (let j = 0; j < width; ++j) {
@@ -146,6 +143,36 @@ export function runGame(argv: Arguments) {
           }
         }
       }
+    }
+  }
+
+  // 检查起始位置和目标位置
+  if (!game.initialGraphId || !game.targetGraphId) {
+    throw new Error("Fail to determine initial graph or target graph");
+  }
+
+  // 处理地图上的传送门
+  for (const fromGraph of Array.from(initialSituation.graphs.values())) {
+    const firstItem = fromGraph.items[0];
+
+    if (firstItem && firstItem.type === ItemType.PORTAL) {
+      const portal = firstItem as Portal;
+      const toMapId = portal.toMapId;
+      const toMap = game.maps.filter(map => map.mapId === toMapId)[0];
+
+      if (toMap) {
+        const { toOriginalRow, toOriginalCol } = portal;
+        const { truncateRowStart, truncateColumnStart } = toMap;
+        const toX = toOriginalRow - truncateRowStart;
+        const toY = toOriginalCol - truncateColumnStart;
+        const toGraphId = (toMap.graphIdMarks as number[][])[toX][toY];
+        const toGraph = initialSituation.graphs.get(toGraphId);
+        if (toGraph) {
+          connectGraph(fromGraph.graphId, toGraph.graphId);
+        }
+      }
+
+      fromGraph.items.shift();  // 消耗此传送门
     }
   }
 
@@ -215,16 +242,16 @@ export function runGame(argv: Arguments) {
       }
     }
 
-    // 销毁不是永久物品的物品
-    graph.items = graph.items.filter(item => isPermanentItem(item));
+    // 销毁掉当前节点上的所有物品
+    graph.items = [];
   };
 
   const mergeGraphs = (situation: Situation, baseGraphId: number, branchGraphId: number) => {
     const baseGraph = situation.graphs.get(baseGraphId) as Graph;
     const branchGraph = situation.graphs.get(branchGraphId) as Graph;
 
-    if (!branchGraph.couldBeMerged) {
-      throw "目标区块不可被合并。";
+    if (branchGraph.graphId === game.targetGraphId) {
+      situation.targetReached = true;
     }
 
     for (const toGraphId of Array.from(branchGraph.connectedGraphs.values())) {
@@ -304,20 +331,21 @@ export function runGame(argv: Arguments) {
     const logs = [];
 
     // 记录到达位置
-    logs.push(`移动到${situation.currentGraph.firstItemLocation} (id: ${situation.currentGraphId})`);
+    const mapId = situation.currentGraph.mapId;
+    const mapName = game.maps.filter(map => map.mapId === situation.currentGraph.mapId)[0].name;
+    logs.push(`移动到${situation.currentGraph.firstItemLocation} [${mapName}] (map_id: ${mapId} graph_id: ${situation.currentGraphId})`);
 
     // 处理当前区域的物品
     handleGraphItems(situation, situation.currentGraphId, logs);
 
-    // 判断当前是否位于目标区域
+    // 判断是否抵达目标区域
     situation.visitedGraphs.add(situation.currentGraphId);
     if (situation.currentGraphId === game.targetGraphId) {
-      solutions.push(situation);
-      continue;
+      situation.targetReached = true;
     }
 
     // 聚合连通分量
-    if (situation.fromGraphId && situation.currentGraph.couldBeMerged /** TODO && 是可以聚合的区块 */) {
+    if (situation.fromGraphId) {
       mergeGraphs(situation, situation.fromGraphId, situation.currentGraphId);
     }
 
@@ -328,12 +356,10 @@ export function runGame(argv: Arguments) {
       for (const nearGraphId of Array.from(situation.currentGraph.connectedGraphs.values())) {
         const nearGraph = situation.getGraphById(nearGraphId);
         if (!situation.visitedGraphs.has(nearGraphId) && (!nearGraph.items[0] || isBuffOrToolItem(nearGraph.items[0]))) {
-          if (nearGraph.couldBeMerged) {
-            handleGraphItems(situation, nearGraphId, logs);
-            mergeGraphs(situation, situation.currentGraphId, nearGraphId);
-            situation.visitedGraphs.add(nearGraphId);
-            ++mergedCount;
-          }
+          handleGraphItems(situation, nearGraphId, logs);
+          mergeGraphs(situation, situation.currentGraphId, nearGraphId);
+          situation.visitedGraphs.add(nearGraphId);
+          ++mergedCount;
         }
       }
 
@@ -342,33 +368,40 @@ export function runGame(argv: Arguments) {
       }
     }
 
+    // 判断是否达到目标区域
+    if (situation.targetReached) {
+      logs.push("已达成目标");
+    }
+
     // 结束报告
     situation.logs += "# " + logs.join("；") + "\n";
 
+    // 判断是否到达目标地点
+    if (situation.targetReached) {
+      solutions.push(situation);
+      continue;
+    }
+
     // 决定下一步方向
-    if (/* 如果是传送门并且目标位置没有访问过 */ false) {
-      // 强制传送到目标地点
-    } else {
-      let hasNext = false;
+    let hasNext = false;
 
-      // 在相邻区块中选择方向
-      for (const nextGraphId of Array.from(situation.currentGraph.connectedGraphs)) {
-        const nextGraph = situation.getGraphById(nextGraphId);
-        const firstItem = nextGraph.items[0];
+    // 在相邻区块中选择方向
+    for (const nextGraphId of Array.from(situation.currentGraph.connectedGraphs)) {
+      const nextGraph = situation.getGraphById(nextGraphId);
+      const firstItem = nextGraph.items[0];
 
-        if (!situation.visitedGraphs.has(nextGraphId) && situation.actor.couldHandle(firstItem)) {
-          const nextSituation = situation.clone();
-          nextSituation.fromGraphId = situation.currentGraph.graphId;
-          nextSituation.currentGraphId = nextGraphId;
-          situations.push(nextSituation);
-          hasNext = true;
-        }
+      if (!situation.visitedGraphs.has(nextGraphId) && situation.actor.couldHandle(firstItem)) {
+        const nextSituation = situation.clone();
+        nextSituation.fromGraphId = situation.currentGraph.graphId;
+        nextSituation.currentGraphId = nextGraphId;
+        situations.push(nextSituation);
+        hasNext = true;
       }
+    }
 
-      // 如果无法进行下一步则判定为困毙
-      if (!hasNext) {
-        ++deadEnd;
-      }
+    // 如果无法进行下一步则判定为困毙
+    if (!hasNext) {
+      ++deadEnd;
     }
   }
 }

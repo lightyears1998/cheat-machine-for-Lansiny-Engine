@@ -11,8 +11,21 @@ export class GameMap {
 
   originHeight!: number
   originWidth!: number
+  truncateRowStart!: number
+  truncateRowEnd!: number
+  truncateColumnStart!: number
+  truncateColumnEnd!: number
 
-  constructor(mapId: number, name: string, height: number, width: number, extra: {originHeight: number, originWidth: number}) {
+  graphIdMarks?: number[][]
+
+  constructor(mapId: number, name: string, height: number, width: number, extra: {
+    originHeight: number,
+    originWidth: number,
+    truncateRowStart: number
+    truncateRowEnd: number
+    truncateColumnStart: number
+    truncateColumnEnd: number
+  }) {
     this.mapId = mapId;
     this.name = name;
     this.height = height;
@@ -24,6 +37,10 @@ export class GameMap {
 
     this.originHeight = extra.originHeight;
     this.originWidth = extra.originWidth;
+    this.truncateRowStart = extra.truncateRowStart;
+    this.truncateRowEnd = extra.truncateRowEnd;
+    this.truncateColumnStart = extra.truncateColumnStart;
+    this.truncateColumnEnd = extra.truncateColumnEnd;
   }
 
   static create(data: GameMap): GameMap {
@@ -37,7 +54,11 @@ export class GameMap {
       data.height,
       data.width, {
         originHeight: data.originHeight,
-        originWidth: data.originWidth
+        originWidth: data.originWidth,
+        truncateColumnStart: data.truncateColumnStart,
+        truncateColumnEnd: data.truncateColumnEnd,
+        truncateRowStart: data.truncateRowStart,
+        truncateRowEnd: data.truncateRowEnd
       });
     if (data.blocks) {
       gameMap.blocks = data.blocks;

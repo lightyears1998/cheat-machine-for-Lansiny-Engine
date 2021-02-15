@@ -9,7 +9,7 @@ import fs from "fs-extra";
 
 import { GameMap } from "./entity";
 
-export function inspectMap(argv: Arguments) {
+export function inspectMap(argv: Arguments): void {
   const mapIdsString = String(argv._.shift());
   const mapIds = mapIdsString
     .split("").filter(ch => isNumberString(ch) || ch === ",").join("")

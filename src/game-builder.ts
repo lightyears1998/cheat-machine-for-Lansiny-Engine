@@ -8,7 +8,7 @@ import { Actor, GameMap } from "./entity";
 import { getInitialAndTargetLocation } from "./util";
 import { Game } from "./entity/Game";
 
-export function buildGame(argv: Arguments) {
+export function buildGame(argv: Arguments): void {
   const mapIdsString = String(argv.map);
   const mapIds = mapIdsString.split("").filter(ch => isNumberString(ch) || ch === ",").join("").replace(/,/g, " ").replace(/\s+/g, " ").split(" ").map(id => Number(id));
 

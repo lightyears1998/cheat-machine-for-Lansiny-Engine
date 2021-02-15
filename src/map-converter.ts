@@ -8,7 +8,7 @@ import { GameMap, MapBlock } from "./entity";
 import { identifyItem } from "./entity";
 import { UpstreamMapInfo, UpstreamMapInfos } from "./entity/UpstreamMapInfosJSON";
 
-export function convertMap(argv: Arguments) {
+export function convertMap(argv: Arguments): void {
   const autoTruncate = (argv.autoTruncate ?? true) as boolean;
 
   const mapInfos = readMapInfos().filter(info => info != null) as Array<UpstreamMapInfo>;
@@ -67,9 +67,23 @@ export function convertMap(argv: Arguments) {
       }
 
       const [actualHeight, actualWidth] = [endX - startX + 1, endY - startY + 1];
-      map = new GameMap(id, name, actualHeight, actualWidth, { originHeight: height, originWidth: width });
+      map = new GameMap(id, name, actualHeight, actualWidth, {
+        originHeight: height,
+        originWidth: width,
+        truncateRowStart: startX,
+        truncateRowEnd: endX,
+        truncateColumnStart: startY,
+        truncateColumnEnd: endY
+      });
     } else {
-      map = new GameMap(id, name, height, width, { originHeight: height, originWidth: width });
+      map = new GameMap(id, name, height, width, {
+        originHeight: height,
+        originWidth: width,
+        truncateRowStart: 0,
+        truncateRowEnd: height - 1,
+        truncateColumnStart: 0,
+        truncateColumnEnd: width - 1
+      });
     }
 
     const blocks = map.blocks;

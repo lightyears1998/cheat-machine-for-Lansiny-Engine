@@ -2,6 +2,8 @@ import { Actor } from "./Actor";
 import { Graph } from "./Graph";
 
 export class Situation {
+  targetReached = false
+
   fromGraphId?: number
   currentGraphId!: number
   actor!: Actor
