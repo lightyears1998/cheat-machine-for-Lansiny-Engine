@@ -81,6 +81,8 @@ export class Actor implements Fighter {
           case DoorKeySubtype.YELLOW: return this.keyYellow > 0;
           case DoorKeySubtype.BLUE: return this.keyBlue > 0;
           case DoorKeySubtype.RED: return this.keyRed > 0;
+          case DoorKeySubtype.INGENIOUS_DOOR: return false; // 不处理机关门
+          case DoorKeySubtype.IRON_DOOR: return false; // 不处理铁门
         }
         break;
       }

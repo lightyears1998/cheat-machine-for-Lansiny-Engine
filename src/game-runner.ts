@@ -75,11 +75,8 @@ export function runGame(argv: Arguments): void {
               if (blocks[nearI][nearJ].isPassable) {
                 if (!isBlockingItem(blocks[nearI][nearJ].item) && !isBlockingItem(blocks[currentI][currentJ].item)) {
                   graphIdMarks[nearI][nearJ] = graphIdMarks[currentI][currentJ];
-                } else {
-                  graphIdMarks[nearI][nearJ] = registerGraph(mapId, nearI, nearJ);
-                  connectGraph(graphIdMarks[currentI][currentJ], graphIdMarks[nearI][nearJ]);
+                  queue.push([nearI, nearJ]);
                 }
-                queue.push([nearI, nearJ]);
               }
             }
           }
@@ -87,8 +84,23 @@ export function runGame(argv: Arguments): void {
       }
     }
 
+    for (let i = 0; i < height; ++i) {
+      for (let j = 0; j < width; ++j) {
+        const item = blocks[i][j].item;
+        if (item && isBlockingItem(item)) {
+          graphIdMarks[i][j] = registerGraph(mapId, i, j);
+          for (const v of directionVector) {
+            const nearI = i + v[0], nearJ = j + v[1];
+            if (graphIdMarks[nearI][nearJ] !== 0) {
+              connectGraph(graphIdMarks[i][j], graphIdMarks[nearI][nearJ]);
+            }
+          }
+        }
+      }
+    }
+
     if (argv.debugMark) {
-      console.log(map.name, map.mapId);
+      console.log(map.name, "mapId:", map.mapId);
       console.log(table(graphIdMarks));
     }
 
@@ -287,29 +299,34 @@ export function runGame(argv: Arguments): void {
       }
       break;
     }
-    ++trial;
-
-    const situation = situations.shift() as Situation;
 
     // 清理情况较差的分支
-    if (situations.length > 160000) {
-      let awaiting = situations.length, coefficient = 0.5;
+    if (situations.length > 8192) {
+      let awaiting = situations.length, coefficient = 1;
       const totalPoints = situations.map(situation => situation.actor).reduce((ac, cur) => ac + evaluate(cur), 0);
       const averagePoints = totalPoints / awaiting;
 
-      while (awaiting > 160000) {
-        const baselinePoints = averagePoints * coefficient;
-        situations = situations.filter(situation => evaluate(situation.actor) >= baselinePoints);
+      while (awaiting > 8192) {
+        const baselinePoints = averagePoints * 0.8 + coefficient;
+        let filteredSituations = situations.filter(situation => evaluate(situation.actor) >= baselinePoints);
 
+        if (filteredSituations.length === 0) {
+          filteredSituations = situations.slice(0, 8192);
+        }
+
+        situations = filteredSituations;
         filter += awaiting - situations.length;
         awaiting = situations.length;
-        coefficient = coefficient * 1.025;
+        coefficient++;
 
         if (argv.debugFilter) {
           console.log("filtering, baselinePoints:", baselinePoints, "filter:", filter, "awaiting:", awaiting);
         }
       }
     }
+
+    ++trial;
+    const situation = situations.shift() as Situation;
 
     // 层数报告
     if (Math.min(situation.graphs.size, minGraphCount) !== minGraphCount) {

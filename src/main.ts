@@ -5,6 +5,7 @@ import { convertMap } from "./map-converter";
 import { buildGame } from "./game-builder";
 import { runGame } from "./game-runner";
 import { inspectMap } from "./map-tools";
+import { testFight } from "./playground";
 
 const helpMessage = "请看 README";
 
@@ -30,6 +31,11 @@ async function bootstrap() {
 
     case "buildGame": {
       buildGame(argv);
+      break;
+    }
+
+    case "testFight": {
+      testFight(argv);
       break;
     }
 

@@ -1,8 +1,10 @@
+import { isTemplateLiteralTypeNode } from "typescript";
+
 import { DoorKeySubtype } from "./DoorKey";
 import { getEnemyByName } from "./EnemyData";
 import { BlueGemRank, RedGemRank } from "./Gem";
 import { Item } from "./Item";
-import { ItemType } from "./ItemType";
+import { BlockingItemType, ItemType } from "./ItemType";
 import { Portal } from "./Portal";
 import { PotionRank } from "./Potion";
 import { UpstreamMapEvent } from "./UpsteamMapJSON";
@@ -12,6 +14,10 @@ export function identifyItem(event: UpstreamMapEvent): Item | undefined {
   const { note } = event;
 
   switch (name) {
+    case "有裂缝的墙": {
+      return Item.create({ type: ItemType.BLOCKING, subtype: BlockingItemType.CRACKED_WALL });
+    }
+
     case "药水": {
       for (const page of event.pages) {
         for (const entry of page.list) {
@@ -134,16 +140,23 @@ export function isBlockingItem(item?: Item): boolean {
   if (!item) {
     return false;
   }
+  const itemType = item.type;
 
-  return item.type === ItemType.ENEMY || item.type === ItemType.DOOR || item.type === ItemType.PORTAL;
+  const blockingItems = [
+    ItemType.ENEMY,
+    ItemType.DOOR,
+    ItemType.PORTAL,
+    ItemType.BLOCKING
+  ];
+  return blockingItems.includes(itemType);
 }
 
 export function isBuffOrToolItem(item?: Item): boolean {
   if (!item) {
     return false;
   }
-
   const itemType = item.type;
+
   const toolItemTypes = [
     ItemType.RED_GEM,
     ItemType.BLUE_GEM,
