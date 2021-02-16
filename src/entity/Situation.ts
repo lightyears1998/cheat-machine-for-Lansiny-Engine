@@ -10,9 +10,9 @@ export class Situation {
 
   maps: Set<number> = new Set()
   graphs: Map<number, Graph> = new Map()
-  visitedGraphs: Set<number> = new Set()
 
-  logs = ""
+  graphPath: number[] = []
+  destroyedEnemyPoints = 0
 
   get currentGraph(): Graph {
     return this.getGraphById(this.currentGraphId);
@@ -38,17 +38,13 @@ export class Situation {
       const neoGraph = (this.graphs.get(graphId) as Graph).clone();
       neo.graphs.set(graphId, neoGraph);
     }
-    neo.visitedGraphs = new Set(Array.from(this.visitedGraphs.values()));
-    neo.logs = this.logs;
+    neo.graphPath = this.graphPath.slice();
+    neo.destroyedEnemyPoints = this.destroyedEnemyPoints;
 
     return neo;
   }
 
   getGraphById(graphId: number): Graph {
     return this.graphs.get(graphId) as Graph;
-  }
-
-  clearVisitedGraph(): void {
-    this.visitedGraphs = new Set();
   }
 }

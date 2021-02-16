@@ -8,7 +8,7 @@
         "runtimeExecutable": "node",
         "runtimeArgs": ["--nolazy", "-r", "ts-node/register/transpile-only"],
 
-        "args": ["src/main.ts", "run", "Game01", "--debugMark"],
+        "args": ["src/main.ts", "run", "Game01", "--debugMark", "--debugFilter"],
 
         "cwd": "${workspaceRoot}",
         "internalConsoleOptions": "openOnSessionStart",

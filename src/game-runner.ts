@@ -9,6 +9,7 @@ import {
   Actor, cumulativeExpRequiredForLevelUp, Enemy, Graph, isBlockingItem, isBuffOrToolItem, ItemType, Portal, Situation
 } from "./entity";
 import { directionVector, make2DArray } from "./util";
+import { Fighter } from "./entity/Fighter";
 
 export function runGame(argv: Arguments): void {
   const gameName = String(argv._.shift());
@@ -189,18 +190,34 @@ export function runGame(argv: Arguments): void {
   }
 
   // 推理过程
-  let situations = [initialSituation] as Array<Situation>;
+  let situations = [initialSituation.clone()] as Array<Situation>;
   const solutions = [] as Array<Situation>;
   let trial = 0, filter = 0, deadEnd = 0;
   let minGraphCount = situations[0].graphs.size;
-  console.log(new Date(), "Origin graph size:", minGraphCount);
+  console.log(new Date(), "原始区块数量：", minGraphCount);
 
-  const evaluate = (actor: Actor): number => {
-    const expToUpgrade = cumulativeExpRequiredForLevelUp[actor.level + 1];
-    return actor.hp + (actor.level) * 200 + (actor.level + 1) * 200 * (actor.exp / expToUpgrade) + actor.atk * 20 + actor.def * 20;
+  const evaluateFighter = (figher: Fighter): number => {
+    return figher.hp * 5 + figher.atk * 20 + figher.def * 20;
   };
 
-  const handleGraphItems = (situation: Situation, graphId: number, logs: string[]) => {
+  const evaluateActor = (actor: Actor): number => {
+    const fighterPoints = evaluateFighter(actor);
+
+    const expToUpgrade = cumulativeExpRequiredForLevelUp[actor.level + 1];
+    const levelPoints = (((actor.level + 1) * 200 + actor.hp * 0.2) * (actor.exp / expToUpgrade)) * 5;
+
+    const goldPoints = actor.gold * 1.5;
+
+    return fighterPoints + levelPoints + goldPoints;
+  };
+
+  const evaluateSituation = (situation: Situation): number => {
+    const actorPoints = evaluateActor(situation.actor);
+    return actorPoints + situation.destroyedEnemyPoints;
+  };
+
+  const handleGraphItems = (situation: Situation, graphId: number, logs?: string[]) => {
+    logs = logs ?? [];
     const actor = situation.actor;
     const graph = situation.getGraphById(graphId);
 
@@ -210,23 +227,25 @@ export function runGame(argv: Arguments): void {
 
       switch (type) {
         case ItemType.ENEMY: {
-          actor.fight(item as Enemy);
+          const enemy = item as Enemy;
+
+          actor.fight(enemy);
           logs.push(`战胜了${(item as Enemy).name}；LEVEL: ${actor.level} HP：${actor.hp} EXP：${actor.exp} ATK: ${actor.atk} DEF: ${actor.def} GOLD：${actor.gold}`);
-          situation.clearVisitedGraph();
+
+          const enemyPoints = evaluateFighter(enemy);
+          situation.destroyedEnemyPoints += enemyPoints;
           break;
         }
 
         case ItemType.RED_GEM: {
           const log = actor.handle(item);
           logs.push(log);
-          situation.clearVisitedGraph();
           break;
         }
 
         case ItemType.BLUE_GEM: {
           const log = actor.handle(item);
           logs.push(log);
-          situation.clearVisitedGraph();
           break;
         }
 
@@ -239,14 +258,12 @@ export function runGame(argv: Arguments): void {
         case ItemType.KEY: {
           const log = actor.handle(item);
           logs.push(log);
-          situation.clearVisitedGraph();
           break;
         }
 
         case ItemType.POTION: {
           const log = actor.handle(item);
           logs.push(log);
-          situation.clearVisitedGraph();
           break;
         }
 
@@ -279,49 +296,62 @@ export function runGame(argv: Arguments): void {
     situation.currentGraphId = baseGraphId;
   };
 
+  const logPosition = (situation: Situation, graphId: number, logs?: string[]) => {
+    logs = logs ?? [];
+
+    const graph = situation.graphs.get(graphId) as Graph;
+    const mapId = graph.mapId;
+    const mapName = game.maps.filter(map => map.mapId === mapId)[0].name;
+    logs.push(`移动到${graph.firstItemLocation} [${mapName}] (mapId: ${mapId} graphId: ${graph.graphId})`);
+  };
+
+  const printLogs = (graphPath: number[]) => {
+    const situation = initialSituation.clone();
+    const logs = [] as string[];
+
+    for (const graphId of graphPath) {
+      const graphlogs = [] as string[];
+      logPosition(situation, graphId, graphlogs);
+      handleGraphItems(situation, graphId, graphlogs);
+      if (graphlogs.length > 1) {
+        logs.push(`# ${graphlogs.join("；")}`);
+      }
+    }
+
+    return logs.join("\n");
+  };
+
   while (true) {
     if (situations.length === 0) {
       if (solutions.length > 0) {
-        console.log("Found solution!");
-        solutions.sort((a, b) => -(evaluate(a.actor) - evaluate(b.actor)));
-        console.log("Possible solutions:", solutions.length, "\ttrial:", trial, "\tdead end:", deadEnd);
+        console.log("找到解法！");
+        solutions.sort((a, b) => -(evaluateSituation(a) - evaluateSituation(b)));
+        console.log("可行解数量：", solutions.length, "计算节点数量：", trial, "失败次数：", deadEnd, "排除节点数量：", filter);
 
         const hpSet = new Set();
         for (let i = 0; i < solutions.length; ++i) {
           const hp = solutions[i].actor.hp;
           if (!hpSet.has(hp)) {
-            console.log("final hp:", hp, solutions[i].logs);
+            console.log("最终生命值：", hp, printLogs(situations[i].graphPath));
             hpSet.add(hp);
           }
         }
       } else {
-        console.log("Sorry but I can't find a solution.", "\ttrial:", trial, "\tdead end:", deadEnd, "\tfilter", filter);
+        console.log("未能找到解决方案QAQ", "计算节点数量：", trial, "失败次数：", deadEnd, "排除节点数量：", filter);
       }
       break;
     }
 
     // 清理情况较差的分支
-    if (situations.length > 8192) {
-      let awaiting = situations.length, coefficient = 1;
-      const totalPoints = situations.map(situation => situation.actor).reduce((ac, cur) => ac + evaluate(cur), 0);
-      const averagePoints = totalPoints / awaiting;
+    if (situations.length > 16384) {
+      let awaiting = situations.length;
 
-      while (awaiting > 8192) {
-        const baselinePoints = averagePoints * 0.8 + coefficient;
-        let filteredSituations = situations.filter(situation => evaluate(situation.actor) >= baselinePoints);
+      situations = situations.sort((a, b) => -(evaluateSituation(a) - evaluateSituation(b))).slice(0, 8192);
+      filter += awaiting - situations.length;
+      awaiting = situations.length;
 
-        if (filteredSituations.length === 0) {
-          filteredSituations = situations.slice(0, 8192);
-        }
-
-        situations = filteredSituations;
-        filter += awaiting - situations.length;
-        awaiting = situations.length;
-        coefficient++;
-
-        if (argv.debugFilter) {
-          console.log("filtering, baselinePoints:", baselinePoints, "filter:", filter, "awaiting:", awaiting);
-        }
+      if (argv.debugFilter) {
+        console.log("触发过滤", "已过滤：", filter, "队列中：", awaiting);
       }
     }
 
@@ -336,27 +366,22 @@ export function runGame(argv: Arguments): void {
 
       let maxPoints = 0;
       for (const candidate of candidates) {
-        maxPoints = Math.max(evaluate(candidate.actor), maxPoints);
+        maxPoints = Math.max(evaluateSituation(candidate), maxPoints);
       }
 
-      const maxSituation = candidates.filter(situation => evaluate(situation.actor) === maxPoints);
+      const maxSituation = candidates.filter(situation => evaluateSituation(situation) === maxPoints)[0];
 
-      console.log(new Date(), "graph size:", minGraphCount, "awaiting:", situations.length, "filter:", filter, `\n${maxSituation[0].logs}`);
+      console.log(new Date(), "节点数量：", minGraphCount, "队列中：", situations.length, "已过滤", filter, `\n${printLogs(maxSituation.graphPath)}`);
+      console.log("角色分数：", evaluateActor(maxSituation.actor), "消灭敌人分数：", maxSituation.destroyedEnemyPoints);
     }
 
-    // 开始报告
-    const logs = [];
-
     // 记录到达位置
-    const mapId = situation.currentGraph.mapId;
-    const mapName = game.maps.filter(map => map.mapId === situation.currentGraph.mapId)[0].name;
-    logs.push(`移动到${situation.currentGraph.firstItemLocation} [${mapName}] (map_id: ${mapId} graph_id: ${situation.currentGraphId})`);
+    situation.graphPath.push(situation.currentGraphId);
 
     // 处理当前区域的物品
-    handleGraphItems(situation, situation.currentGraphId, logs);
+    handleGraphItems(situation, situation.currentGraphId);
 
     // 判断是否抵达目标区域
-    situation.visitedGraphs.add(situation.currentGraphId);
     if (situation.currentGraphId === game.targetGraphId) {
       situation.targetReached = true;
     }
@@ -372,10 +397,10 @@ export function runGame(argv: Arguments): void {
 
       for (const nearGraphId of Array.from(situation.currentGraph.connectedGraphs.values())) {
         const nearGraph = situation.getGraphById(nearGraphId);
-        if (!situation.visitedGraphs.has(nearGraphId) && (!nearGraph.items[0] || isBuffOrToolItem(nearGraph.items[0]))) {
-          handleGraphItems(situation, nearGraphId, logs);
+        if (!nearGraph.items[0] || isBuffOrToolItem(nearGraph.items[0])) {
+          handleGraphItems(situation, nearGraphId);
           mergeGraphs(situation, situation.currentGraphId, nearGraphId);
-          situation.visitedGraphs.add(nearGraphId);
+          situation.graphPath.push(nearGraph.graphId);
           ++mergedCount;
         }
       }
@@ -384,14 +409,6 @@ export function runGame(argv: Arguments): void {
         break;
       }
     }
-
-    // 判断是否达到目标区域
-    if (situation.targetReached) {
-      logs.push("已达成目标");
-    }
-
-    // 结束报告
-    situation.logs += "# " + logs.join("；") + "\n";
 
     // 判断是否到达目标地点
     if (situation.targetReached) {
@@ -407,7 +424,7 @@ export function runGame(argv: Arguments): void {
       const nextGraph = situation.getGraphById(nextGraphId);
       const firstItem = nextGraph.items[0];
 
-      if (!situation.visitedGraphs.has(nextGraphId) && situation.actor.couldHandle(firstItem)) {
+      if (situation.actor.couldHandle(firstItem)) {
         const nextSituation = situation.clone();
         nextSituation.fromGraphId = situation.currentGraph.graphId;
         nextSituation.currentGraphId = nextGraphId;

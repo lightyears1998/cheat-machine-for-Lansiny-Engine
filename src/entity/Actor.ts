@@ -1,8 +1,10 @@
+import { isTemplateLiteralTypeNode } from "typescript";
+
 import { DoorKeySubtype } from "./DoorKey";
 import { Enemy } from "./Enemy";
 import { Fighter } from "./Fighter";
 import { Item } from "./Item";
-import { ItemType } from "./ItemType";
+import { BlockingItemType, ItemType } from "./ItemType";
 import { getPotionEffect } from "./Potion";
 import { skillData } from "./SkillData";
 
@@ -76,6 +78,14 @@ export class Actor implements Fighter {
     }
 
     switch (item.type as ItemType) {
+      case ItemType.BLOCKING: {
+        switch (item.subtype) {
+          case BlockingItemType.CRACKED_WALL: {
+            return false; // 不处理有裂缝的墙
+          }
+        }
+      }
+
       case ItemType.DOOR: {
         switch (item.subtype as DoorKeySubtype) {
           case DoorKeySubtype.YELLOW: return this.keyYellow > 0;
@@ -84,7 +94,6 @@ export class Actor implements Fighter {
           case DoorKeySubtype.INGENIOUS_DOOR: return false; // 不处理机关门
           case DoorKeySubtype.IRON_DOOR: return false; // 不处理铁门
         }
-        break;
       }
 
       case ItemType.ENEMY: {
@@ -103,6 +112,14 @@ export class Actor implements Fighter {
 
   handle(item: Item): string {
     switch (item.type as ItemType) {
+      case ItemType.BLOCKING: {
+        switch (item.subtype) {
+          case BlockingItemType.CRACKED_WALL: {
+            throw "无法处理有裂缝的墙";
+          }
+        }
+      }
+
       case ItemType.DOOR: {
         switch (item.subtype as DoorKeySubtype) {
           case DoorKeySubtype.YELLOW:
